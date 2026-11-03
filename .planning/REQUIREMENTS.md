@@ -91,13 +91,46 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmapper) | | Pending |
+| FND-01 | Phase 1 | Pending |
+| FND-02 | Phase 1 | Pending |
+| FND-03 | Phase 1 | Pending |
+| FND-04 | Phase 1 | Pending |
+| LOG-01 | Phase 1 | Pending |
+| SND-03 | Phase 1 | Pending |
+| RUN-01 | Phase 2 | Pending |
+| RUN-02 | Phase 2 | Pending |
+| RUN-03 | Phase 2 | Pending |
+| RUN-04 | Phase 2 | Pending |
+| SCR-01 | Phase 2 | Pending |
+| SCR-02 | Phase 2 | Pending |
+| EXT-01 | Phase 2 | Pending |
+| EXT-02 | Phase 2 | Pending |
+| EXT-03 | Phase 2 | Pending |
+| QUA-01 | Phase 3 | Pending |
+| QUA-02 | Phase 3 | Pending |
+| QUA-03 | Phase 3 | Pending |
+| QUA-04 | Phase 3 | Pending |
+| QUA-05 | Phase 3 | Pending |
+| POC-01 | Phase 4 | Pending |
+| POC-02 | Phase 4 | Pending |
+| POC-03 | Phase 4 | Pending |
+| POC-04 | Phase 4 | Pending |
+| DRF-01 | Phase 5 | Pending |
+| DRF-02 | Phase 5 | Pending |
+| DRF-03 | Phase 5 | Pending |
+| DRF-04 | Phase 5 | Pending |
+| SND-01 | Phase 6 | Pending |
+| SND-02 | Phase 6 | Pending |
+| LOG-02 | Phase 6 | Pending |
+| LOG-03 | Phase 6 | Pending |
+| LOG-04 | Phase 6 | Pending |
+| LOG-05 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 33 total
-- Mapped to phases: 0
-- Unmapped: 33 ⚠️
+- v1 requirements: 34 total (corrected from 33; the list above contains 34 distinct IDs)
+- Mapped to phases: 34
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-11-03*
-*Last updated: 2026-11-03 after initial definition*
+*Last updated: 2026-11-03 after roadmap creation*
