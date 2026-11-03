@@ -63,6 +63,14 @@
 - [ ] **LOG-04**: A demo set of 5 to 8 domains (fits, non-fits, an unscrapeable site, a no-contact case) is run, with sample output saved
 - [ ] **LOG-05**: A README explains how to run, the known limits, and the cold-email compliance notes
 
+### Web Runner
+
+- [ ] **WEB-01**: A deployed Vercel URL serves a page where the owner enters a company domain and starts a full pipeline run
+- [ ] **WEB-02**: The page and its API refuse every request without the shared password (APP_PASSWORD), and secrets exist only as Vercel environment variables entered by the owner
+- [ ] **WEB-03**: Each stage's progress and result appears on the page as it finishes, and each stage fits within the serverless time limit
+- [ ] **WEB-04**: The finished run shows the decision log (why this company, why this person, why this email) and the sent email, which goes only to the owner's address
+- [ ] **WEB-05**: Per-session run limits and a Hunter-search ceiling prevent a shared link from exhausting credits
+
 ## v2 Requirements
 
 - **ICP-01**: Incumbent GRC-tool detection (Vanta, Drata, Secureframe) with a score penalty and hook branching

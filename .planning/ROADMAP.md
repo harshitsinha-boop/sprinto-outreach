@@ -23,6 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: PoC Selection** - One named decision-maker per qualified company from cached, budget-capped Hunter lookups
 - [ ] **Phase 5: Pain Points, Draft and Validator** - Two grounded pain points and a validated 50-90 word email addressed by name
 - [ ] **Phase 6: Send, Decision Log and Demo Hardening** - Guarded Resend send, readable and replayable decision trail, rehearsed demo set and README
+- [ ] **Phase 7: Password-gated web runner deployed on Vercel**
 
 ## Phase Details
 
@@ -130,3 +131,14 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 4. PoC Selection | 0/TBD | Not started | - |
 | 5. Pain Points, Draft and Validator | 0/TBD | Not started | - |
 | 6. Send, Decision Log and Demo Hardening | 0/TBD | Not started | - |
+
+### Phase 7: Password-gated web runner deployed on Vercel
+
+**Goal:** A fully functional, password-gated page deployed on Vercel where the owner enters a company domain and the pipeline runs end to end (scrape, extract, qualify, contact lookup, draft, send to the owner's own email only), showing per-stage progress and the decision log, with run and Hunter-search limits and a design that fits serverless time limits.
+**Mode:** mvp
+**Requirements**: WEB-01, WEB-02, WEB-03, WEB-04, WEB-05
+**Depends on:** Phase 6
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 7 to break down)
