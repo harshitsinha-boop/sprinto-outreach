@@ -40,6 +40,11 @@ class StopStage(Exception):
         self.detail = detail
 
 
+class DomainUnreachable(Exception):
+    """Every fetch for the domain failed at transport level (dead DNS, timeout, 5xx). A plain
+    failure, never a StopStage: the batch records the domain as `failed` and carries on."""
+
+
 SKELETON_PATHS = ("/", "/about")
 MIN_PAGE_CHARS = 400
 MAX_PAGE_CHARS = 8000
@@ -150,6 +155,8 @@ def stage_scrape(ctx: Context, domain: str, prev: dict) -> ScrapeOutput:
     pages = [ctx.fetcher.fetch(f"https://{domain}{path}") for path in SKELETON_PATHS]
     usable = len(usable_pages(pages))
     if usable == 0:
+        if pages and all(p.status == "error" for p in pages):
+            raise DomainUnreachable(f"all {len(pages)} fetches failed: {pages[0].error}")
         raise StopStage("insufficient_data", f"no page reached {MIN_PAGE_CHARS} usable characters")
     return ScrapeOutput(pages=pages, usable=usable)
 

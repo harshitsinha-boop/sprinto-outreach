@@ -7,14 +7,44 @@ renders the summary table.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TextIO
 
 from outreach.audit import now_iso
 from outreach.cache import atomic_write_json, normalize_domain
 from outreach.config import redact
+from outreach.hunter import HunterAuthError, HunterQuotaError
+from outreach.llm import LLMAuthError, LLMQuotaError
 from outreach.models import OUTCOMES, BatchRow, BatchSummary, RunRecord
+from outreach.send import SendError
 from outreach.skeleton import Context, run_one
+
+# Each of these means every later domain would fail the same way: a bad key, an exhausted
+# daily or monthly quota, or a send path that is misconfigured for every domain. Carrying on
+# would only burn calls, so the batch aborts at once.
+SYSTEMIC_ERRORS = (LLMAuthError, LLMQuotaError, HunterAuthError, HunterQuotaError, SendError)
+
+# A cost bound for a batch that has no qualification gate yet (every domain costs up to two
+# Gemini calls).
+MAX_BATCH_DOMAINS = 25
+NOT_RUN_DETAIL = "not run (batch aborted)"
+_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+
+
+class BatchInputError(Exception):
+    """The domains file cannot be run as given (too many domains)."""
+
+
+def _is_hostname(host: str) -> bool:
+    """A public-looking DNS name: at least two valid labels, last label not all digits.
+    Rejects IPv4 literals, `localhost`, bracketed IPv6 and anything containing spaces."""
+    if len(host) > 253:
+        return False
+    labels = host.split(".")
+    if len(labels) < 2 or not all(_LABEL.fullmatch(label) for label in labels):
+        return False
+    return not labels[-1].isdigit()
 
 STOP_OUTCOMES = frozenset({"insufficient_data", "no_contact", "disqualified", "rejected_draft"})
 DETAIL_MAX = 200
@@ -22,22 +52,35 @@ TABLE_DETAIL_MAX = 80
 
 
 def load_domains(path: Path | str) -> list[str | BatchRow]:
-    """Domains in file order. Blank lines and `#` comments are skipped; duplicates keep
-    their first occurrence."""
+    """Entries in file order. A valid domain is a string; a rejected line is a failed BatchRow
+    at its own position, so the summary keeps file order. Blank lines and `#` comments are
+    skipped and duplicates keep their first occurrence. More than MAX_BATCH_DOMAINS domain
+    strings raises BatchInputError."""
     entries: list[str | BatchRow] = []
     seen: set[str] = set()
-    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+    count = 0
+    for number, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), start=1):
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
         try:
             domain = normalize_domain(line)
         except ValueError:
+            domain = ""
+        if not _is_hostname(domain):
+            entries.append(
+                BatchRow(domain=line, outcome="failed", detail=f"invalid domain on line {number}")
+            )
             continue
         if domain in seen:
             continue
         seen.add(domain)
         entries.append(domain)
+        count += 1
+    if count > MAX_BATCH_DOMAINS:
+        raise BatchInputError(
+            f"{count} domains in the file; the per-run cap is {MAX_BATCH_DOMAINS}"
+        )
     return entries
 
 
@@ -84,32 +127,67 @@ def run_batch(
     total = len(entries)
     for i, entry in enumerate(entries, start=1):
         if isinstance(entry, BatchRow):
-            summary.rows.append(entry)  # a rejected line: never runs, keeps its position
-            row = entry
+            row = entry  # a rejected line: never runs, keeps its position
         else:
             domain = entry
+            systemic: Exception | None = None
             try:
-                rec = run_one(domain, ctx)
-                outcome, detail = outcome_for(rec)
+                outcome, detail = outcome_for(run_one(domain, ctx))
             except Exception as exc:  # the per-domain isolation boundary
-                rec = ctx.store.load(domain)
-                if rec is not None:
-                    outcome, detail = outcome_for(rec)
-                else:
-                    outcome = "failed"
-                    detail = redact(f"{type(exc).__name__}: {exc}", ctx.settings)
+                outcome, detail = _outcome_after_exception(domain, exc, ctx)
+                if isinstance(exc, SYSTEMIC_ERRORS):
+                    systemic = exc
             row = BatchRow(
                 domain=domain,
                 outcome=outcome,
                 detail=detail[:DETAIL_MAX],
                 run_record=str(ctx.store.path_for(domain)),
             )
-            summary.rows.append(row)
-        if progress is not None:
-            progress.write(f"[{i}/{total}] {row.domain} -> {row.outcome}\n")
-            progress.flush()
+            if systemic is not None:
+                summary.rows.append(row)
+                _progress(progress, i, total, row)
+                summary.aborted = True
+                summary.abort_reason = redact(
+                    f"systemic failure {type(systemic).__name__} on {domain}: {systemic}",
+                    ctx.settings,
+                )
+                _skip_remaining(summary, entries[i:], i, total, progress)
+                break
+        summary.rows.append(row)
+        _progress(progress, i, total, row)
     _finish(summary)
     return summary
+
+
+def _outcome_after_exception(domain: str, exc: Exception, ctx: Context) -> tuple[str, str]:
+    rec = ctx.store.load(domain)  # run_one flushed the failed record before re-raising
+    if rec is not None:
+        return outcome_for(rec)
+    return "failed", redact(f"{type(exc).__name__}: {exc}", ctx.settings)
+
+
+def _skip_remaining(
+    summary: BatchSummary,
+    remaining: list[str | BatchRow],
+    done: int,
+    total: int,
+    progress: TextIO | None,
+) -> None:
+    """After an abort: nothing runs; every later domain is listed as failed, in file order."""
+    for offset, entry in enumerate(remaining, start=1):
+        row = (
+            entry
+            if isinstance(entry, BatchRow)
+            else BatchRow(domain=entry, outcome="failed", detail=NOT_RUN_DETAIL, run_record=None)
+        )
+        summary.rows.append(row)
+        _progress(progress, done + offset, total, row)
+
+
+def _progress(progress: TextIO | None, i: int, total: int, row: BatchRow) -> None:
+    if progress is not None:
+        progress.write(f"[{i}/{total}] {row.domain} -> {row.outcome}\n")
+        progress.flush()
 
 
 def _finish(summary: BatchSummary) -> None:

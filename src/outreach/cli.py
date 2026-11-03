@@ -15,7 +15,13 @@ from outreach.config import ConfigError, Settings, configure_logging, load_setti
 from outreach.fetch import PageFetcher
 from outreach.hunter import FixtureHunter, HunterClient
 from outreach.llm import LLMClient
-from outreach.runner import load_domains, render_summary, run_batch, write_summary
+from outreach.runner import (
+    BatchInputError,
+    load_domains,
+    render_summary,
+    run_batch,
+    write_summary,
+)
 from outreach.skeleton import Context, run_one
 from outreach.smoke import SMOKE_CHECKS, run_smoke
 
@@ -71,36 +77,69 @@ def run(
         metavar="DOMAINS_FILE",
         help="Text file with one company domain per line (# comments and blank lines are skipped).",
     ),
+    send: bool = typer.Option(
+        False,
+        "--send",
+        help="Actually send through Resend; the recipient is always OWNER_EMAIL. "
+        "The default is a dry run.",
+    ),
+    live_hunter: bool = typer.Option(
+        False,
+        "--live-hunter",
+        help="Use the cache-first, budget-capped live Hunter client. "
+        "The default is the offline fixture, which spends no credit.",
+    ),
 ) -> None:
     """Run every domain in a file through the pipeline and print one summary table.
 
-    A dry run: payloads are printed and Resend is never called.
+    Dry run by default: payloads are printed and Resend is never called. Only --send sends.
+    Exit codes: 0 batch complete, 2 input or config error, 3 aborted by a systemic failure.
     """
     configure_logging()
-    require = ("GEMINI_API_KEY", "OWNER_EMAIL")
+    require = (
+        ("GEMINI_API_KEY", "OWNER_EMAIL")
+        + (("HUNTER_API_KEY",) if live_hunter else ())
+        + (("RESEND_API_KEY",) if send else ())
+    )
     try:
         settings = load_settings(require=require)
     except ConfigError as e:
         raise _fail_config(e) from None
 
-    entries = load_domains(domains_file)
+    try:
+        entries = load_domains(domains_file)
+    except BatchInputError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(2) from None
     n_domains = sum(1 for e in entries if isinstance(e, str))
+    n_invalid = len(entries) - n_domains
     if n_domains == 0:
         typer.echo(f"no domains in {domains_file}", err=True)
         raise typer.Exit(2)
 
-    typer.echo(
-        f"MODE: dry-run (Resend will NOT be called) | recipient: {settings.owner_email} "
-        f"| hunter: fixture (no credits; contact only for {FixtureHunter().fixture_domain}) "
-        f"| domains: {n_domains}"
+    if send:
+        mode_note = f"MODE: SEND (Resend WILL be called; recipient forced to {settings.owner_email})"
+    else:
+        mode_note = f"MODE: dry-run (Resend will NOT be called) | recipient: {settings.owner_email}"
+    if live_hunter:
+        hunter_note = f"live, cache-first, budget {settings.hunter_monthly_budget}"
+    else:
+        hunter_note = f"fixture (no credits; contact only for {FixtureHunter().fixture_domain})"
+    banner = f"{mode_note} | hunter: {hunter_note} | domains: {n_domains}"
+    if n_invalid:
+        banner += f" | invalid: {n_invalid}"
+    typer.echo(banner)
+
+    ctx = build_context(settings, hunter_fixture=not live_hunter, dry_run=not send)
+    summary = run_batch(
+        entries, ctx, hunter_label="live" if live_hunter else "fixture", progress=sys.stdout
     )
-    ctx = build_context(settings, hunter_fixture=True, dry_run=True)
-    summary = run_batch(entries, ctx, hunter_label="fixture", progress=sys.stdout)
     path = write_summary(summary, settings.out_dir)
     typer.echo(render_summary(summary))
-    typer.echo(f"batch=complete domains={len(summary.rows)} summary={path}")
+    status = "aborted" if summary.aborted else "complete"
+    typer.echo(f"batch={status} domains={len(summary.rows)} summary={path}")
     sys.stdout.flush()
-    raise typer.Exit(0)
+    raise typer.Exit(3 if summary.aborted else 0)
 
 
 @app.command()
