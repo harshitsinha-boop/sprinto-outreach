@@ -17,7 +17,7 @@ A time-boxed (1.5 hour) build of a Python CLI that takes a file of company domai
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation and Walking Skeleton** - One hardcoded domain runs end to end as a dry-run, with secrets hygiene and all four APIs proven live
+- [x] **Phase 1: Foundation and Walking Skeleton** - One hardcoded domain runs end to end as a dry-run, with secrets hygiene and all four APIs proven live (completed 2026-11-03)
 - [ ] **Phase 2: Runner, CLI and Real Scrape/Extract** - One command runs a file of domains with failure isolation, safe multi-page scraping and evidence-quoted extraction
 - [ ] **Phase 3: ICP Rubric and Bounded Agent Loop** - Reproducible weighted qualification with a capped, logged agent loop for insufficient data
 - [ ] **Phase 4: PoC Selection** - One named decision-maker per qualified company from cached, budget-capped Hunter lookups
@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Running the skeleton on one domain prints the exact email payload (from, to, subject, body) that would be sent, without calling Resend.
   4. After each stage the domain's run record is on disk, so killing the process mid-run still leaves a partial trail to inspect.
   5. A rate-limited or schema-invalid Gemini response is retried or repaired automatically, and running the same domain a second time makes no new Gemini calls.
-**Plans:** 4/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Walking Skeleton | 4/4 | In Progress | - |
+| 1. Foundation and Walking Skeleton | 4/4 | Complete    | 2026-11-03 |
 | 2. Runner, CLI and Real Scrape/Extract | 0/TBD | Not started | - |
 | 3. ICP Rubric and Bounded Agent Loop | 0/TBD | Not started | - |
 | 4. PoC Selection | 0/TBD | Not started | - |

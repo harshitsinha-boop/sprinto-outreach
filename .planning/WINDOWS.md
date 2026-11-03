@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 1
+open_count: 0
 waived_count: 0
-fixed_count: 0
+fixed_count: 1
 total_count: 1
-last_updated: 2026-11-03T10:03:54.525Z
+last_updated: 2026-11-03T10:06:24.179Z
 ---
 
 # Broken Windows Ledger
@@ -15,7 +15,7 @@ last_updated: 2026-11-03T10:03:54.525Z
 
 | id | phase | kind | file | line | description | status | reason | recorded_at | resolved_at |
 |----|-------|------|------|------|-------------|--------|--------|-------------|-------------|
-| 1 | 01 | unrun-verify | .planning/phases/01-foundation-and-walking-skeleton/01-04-SUMMARY.md |  | Smoke email inbox arrival (Resend id 01a1a0db-bce1-7892-80d2-f213f192aba1) owner-pending | open |  | 2026-11-03T10:03:54.525Z |  |
+| 1 | 01 | unrun-verify | .planning/phases/01-foundation-and-walking-skeleton/01-04-SUMMARY.md |  | Smoke email inbox arrival (Resend id 01a1a0db-bce1-7892-80d2-f213f192aba1) owner-pending | fixed |  | 2026-11-03T10:03:54.525Z | 2026-11-03T10:06:24.179Z |
 
 ````json
 [
@@ -26,10 +26,10 @@ last_updated: 2026-11-03T10:03:54.525Z
     "file": ".planning/phases/01-foundation-and-walking-skeleton/01-04-SUMMARY.md",
     "line": null,
     "description": "Smoke email inbox arrival (Resend id 01a1a0db-bce1-7892-80d2-f213f192aba1) owner-pending",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-11-03T10:03:54.525Z",
-    "resolved_at": null,
+    "resolved_at": "2026-11-03T10:06:24.179Z",
     "milestone": null
   }
 ]
