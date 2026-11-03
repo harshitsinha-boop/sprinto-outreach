@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Running the skeleton on one domain prints the exact email payload (from, to, subject, body) that would be sent, without calling Resend.
   4. After each stage the domain's run record is on disk, so killing the process mid-run still leaves a partial trail to inspect.
   5. A rate-limited or schema-invalid Gemini response is retried or repaired automatically, and running the same domain a second time makes no new Gemini calls.
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed
 
 Plans:
 **Wave 1**
@@ -50,7 +50,7 @@ Plans:
 - [x] 01-03-PLAN.md — Real clients fill the seams: Gemini wrapper (retry, repair, cache), page and Hunter caches, `skeleton` and `smoke` CLI (FND-03, FND-04 offline)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 01-04-PLAN.md — Live proof: owner creates .env, live smoke passes, skeleton dry-run on a real domain, secret scan clean (FND-04 live)
+- [x] 01-04-PLAN.md — Live proof: owner creates .env, live smoke passes, skeleton dry-run on a real domain, secret scan clean (FND-04 live)
 
 Note: the skeleton's Hunter call goes through a minimal cache-first path so the first live call never burns free-tier quota twice. POC-01 itself (qualified-only gating, filtered query, empty results cached) is delivered and verified in Phase 4.
 
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Walking Skeleton | 3/4 | In Progress | - |
+| 1. Foundation and Walking Skeleton | 4/4 | In Progress | - |
 | 2. Runner, CLI and Real Scrape/Extract | 0/TBD | Not started | - |
 | 3. ICP Rubric and Bounded Agent Loop | 0/TBD | Not started | - |
 | 4. PoC Selection | 0/TBD | Not started | - |
