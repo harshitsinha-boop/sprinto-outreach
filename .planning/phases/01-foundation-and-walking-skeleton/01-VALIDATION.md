@@ -59,7 +59,9 @@ created: "2026-11-03"
 | 01-03 T2 | FND-04 | Hunter: miss costs 1 live call, hit costs 0, budget blocks, errors not cached, zero results cached | unit | `.venv/bin/python -m pytest tests/test_hunter.py -x` | ❌ W0 | ⬜ pending |
 | 01-03 T2 | FND-04 | FixtureHunter returns its contact only for piedpiper.com; other domains get zero emails | unit | `.venv/bin/python -m pytest tests/test_hunter.py::test_fixture_hunter_returns_contact_only_for_fixture_domain -x` | ❌ W0 | ⬜ pending |
 | 01-03 T3 | FND-04 | Each smoke check passes on a good fake and fails cleanly on a misbehaving one | unit | `.venv/bin/python -m pytest tests/test_smoke.py -x` | ❌ W0 | ⬜ pending |
-| 01-03 T3 | FND-04 | First cheap-check FAIL stops smoke; later checks SKIPPED; no Hunter search, no Resend send | unit | `.venv/bin/python -m pytest tests/test_smoke.py -k skips -x` | ❌ W0 | ⬜ pending |
+| 01-03 T2 | FND-04 | `account()` keeps a real 0 as 0 (explicit None checks, never truthiness) | unit | `.venv/bin/python -m pytest tests/test_hunter.py::test_account_zero_credits_returns_zero -x` | ❌ W0 | ⬜ pending |
+| 01-03 T3 | FND-04 | First cheap-check FAIL stops smoke; later checks SKIPPED; no Hunter search, no Resend send (incl. a real HunterClient with 0 credits) | unit | `.venv/bin/python -m pytest tests/test_smoke.py -k skips -x` | ❌ W0 | ⬜ pending |
+| 01-03 T3 | FND-04 | Smoke hunter check FAILs as NOT LIVE when served from cache | unit | `.venv/bin/python -m pytest tests/test_smoke.py::test_hunter_cache_hit_fails_not_live -x` | ❌ W0 | ⬜ pending |
 | 01-03 T3 | Criteria 3 and 5 | Real clients: rerun makes zero Gemini, page and Hunter calls; CLI prints payload; fixture on a real domain stops no_contact | e2e | `.venv/bin/python -m pytest tests/test_skeleton_e2e.py -x` | ❌ W0 | ⬜ pending |
 | 01-04 T2 | FND-04, FND-01, SND-03 | Live smoke six PASS lines; separate warm-up then free rerun; scanner clean with real keys | live | `out/smoke.log` PASS gate, warm-up `out/skeleton.log` then `.venv/bin/python -m outreach skeleton`, `.venv/bin/python scripts/check_secrets.py` | n/a (needs `.env`) | ⬜ pending |
 

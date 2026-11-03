@@ -289,7 +289,7 @@ Hunter charges only calls that return >=1 result; repeats are 0 [CITED: hunter.i
 The repo already has commits (`.planning/` docs) and no `.gitignore`. The first Phase 1 commit must contain `.gitignore` and `.env.example` and nothing else; do not ignore `.planning/`. Use `git add -f` later if Phase 6 commits a sanitised sample from an ignored dir, or put samples in `samples/`.
 
 ### Pitfall 11: Skeleton domain has no Hunter personal contacts
-Hunter may return zero emails for the chosen domain (cached at 0 credits, but the skeleton then has no recipient to address). Provide `--hunter-fixture` (uses `tests/fixtures/hunter_domain_search.json`, the captured `test-api-key` response, contact "Richard Hendricks, CEO") so the dry-run completes with zero Hunter credits; log `source: fixture`.
+Hunter may return zero emails for the chosen domain (cached at 0 credits, but the skeleton then has no recipient to address). The skeleton then stops with `no_contact`, which is a correct outcome, and the owner picks another `SKELETON_DOMAIN` (a zero-result search costs no credit). `--hunter-fixture` (uses `tests/fixtures/hunter_domain_search.json`, the captured `test-api-key` response, contact "Richard Hendricks, CEO") returns that contact only for the fixture's own domain, `piedpiper.com`; on any other domain it returns zero emails, so the skeleton stops with `no_contact` and never attaches a fixture person to a real company (revised at planning, see 01-03-PLAN.md `FixtureHunter`). Log `source: fixture`.
 
 ## Code Examples
 
@@ -636,12 +636,12 @@ Skeleton stage specifics (keep tiny):
 | A6 | Gemini/Resend key formats (`AIza...`, `re_...`) for the shape scan | Secret hygiene | Shape scan misses a key; value scan remains authoritative |
 | A7 | Gemini free-tier RPM/RPD are enough for ~7 smoke+skeleton calls | Smoke | 429s during smoke; wrapper retries; limits readable only in AI Studio |
 | A8 | Hunter free-plan allowance is 25 (brief) vs 50 (pricing page) | Pitfall 8 | Settled at smoke time by `/v2/account`; budget default 25 is the safe side |
-| A9 | The chosen skeleton domain has >=1 Hunter personal contact | Pitfall 11 | Skeleton falls back to `--hunter-fixture`; zero-result calls cost 0 |
+| A9 | The chosen skeleton domain has >=1 Hunter personal contact | Pitfall 11 | Skeleton stops with `no_contact` and the owner picks another domain (zero-result calls cost 0); `--hunter-fixture` does not rescue it, because the fixture contact is returned only for `piedpiper.com` |
 | A10 | All 11 packages are legitimate despite seam verdict SUS | Package audit | Mitigated by exact pins and one batched human-verify checkpoint |
 
 ## Open Questions (RESOLVED)
 
-1. **Which domain is the hardcoded skeleton domain?** — RESOLVED (planning): the owner sets `SKELETON_DOMAIN` in `.env` during Plan 01-04 Task 1 (human action); `skeleton --domain` overrides it; the smoke Hunter step searches the same domain so one credit serves both; `--hunter-fixture` guarantees the dry-run completes if the domain has no named contact.
+1. **Which domain is the hardcoded skeleton domain?** — RESOLVED (planning): the owner sets `SKELETON_DOMAIN` in `.env` during Plan 01-04 Task 1 (human action); `skeleton --domain` overrides it; the smoke Hunter step searches the same domain so one credit serves both; if the domain has no named contact the skeleton stops with `no_contact` and the owner picks another domain (01-04 Task 2 step 4). `--hunter-fixture` returns its contact only for `piedpiper.com`; any other domain stops with `no_contact`.
    - Known: needs a scrapable homepage with >=400 chars of text and ideally a Hunter-covered SaaS company.
    - Unclear: Hunter coverage cannot be tested without spending a credit.
 2. **Does the real Hunter return `X-Credits-Used` on this account?** — RESOLVED (planning): the header is optional (`None` counts as 0) and stored in the cache entry; `/v2/account` `remaining` is trusted; Plan 01-04 records whether the header appeared.
