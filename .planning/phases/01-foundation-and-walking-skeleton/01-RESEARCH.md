@@ -639,15 +639,14 @@ Skeleton stage specifics (keep tiny):
 | A9 | The chosen skeleton domain has >=1 Hunter personal contact | Pitfall 11 | Skeleton falls back to `--hunter-fixture`; zero-result calls cost 0 |
 | A10 | All 11 packages are legitimate despite seam verdict SUS | Package audit | Mitigated by exact pins and one batched human-verify checkpoint |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Which domain is the hardcoded skeleton domain?**
-   - Known: needs a scrapable homepage with >=400 chars of text and ideally a Hunter-covered SaaS company; the same domain should be used by the smoke Hunter step so one credit serves both.
+1. **Which domain is the hardcoded skeleton domain?** — RESOLVED (planning): the owner sets `SKELETON_DOMAIN` in `.env` during Plan 01-04 Task 1 (human action); `skeleton --domain` overrides it; the smoke Hunter step searches the same domain so one credit serves both; `--hunter-fixture` guarantees the dry-run completes if the domain has no named contact.
+   - Known: needs a scrapable homepage with >=400 chars of text and ideally a Hunter-covered SaaS company.
    - Unclear: Hunter coverage cannot be tested without spending a credit.
-   - Recommendation: let the user pick (`SKELETON_DOMAIN` in `.env`/CLI default); planner adds it as a human decision in Plan 04; `--hunter-fixture` guarantees the run completes regardless.
-2. **Does the real Hunter return `X-Credits-Used` on this account?** The test key did not. Recommendation: treat as optional; trust `/v2/account` `remaining`.
-3. **Tool role and snake_case wire keys** (A1/A2): only resolved by the live smoke; both have one-line fallbacks.
-4. **Gemini free-tier limits:** visible only in AI Studio; user should glance at the dashboard when pasting the key.
+2. **Does the real Hunter return `X-Credits-Used` on this account?** — RESOLVED (planning): the header is optional (`None` counts as 0) and stored in the cache entry; `/v2/account` `remaining` is trusted; Plan 01-04 records whether the header appeared.
+3. **Tool role and snake_case wire keys** (A1/A2/A4) — RESOLVED (planning): defaults are `TOOL_RESULT_ROLE = "tool"`, `USE_RESPONSE_JSON_SCHEMA = True`, `SEND_THINKING_CONFIG = True`; the smoke auto-falls back to role `"user"` once on a 400; Plan 01-04 flips the matching one-line constant only if the live smoke shows the 400, and records the answer.
+4. **Gemini free-tier limits** — RESOLVED (planning): the owner reads them in AI Studio while creating the key (Plan 01-04 Task 1); `LLMClient` retries 429s honouring `retryDelay` and raises `LLMQuotaError` past a 60 s wait; fallback model `gemini-3.6-flash` via `.env`.
 
 ## Environment Availability
 

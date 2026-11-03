@@ -37,7 +37,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Running the skeleton on one domain prints the exact email payload (from, to, subject, body) that would be sent, without calling Resend.
   4. After each stage the domain's run record is on disk, so killing the process mid-run still leaves a partial trail to inspect.
   5. A rate-limited or schema-invalid Gemini response is retried or repaired automatically, and running the same domain a second time makes no new Gemini calls.
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Secret hygiene first commit, approved pinned dependencies, typed Settings from .env, secret scanner (FND-01, FND-02)
+- [ ] 01-02-PLAN.md — Walking-skeleton tracer: one domain through six stages to a printed owner-addressed dry-run payload, run.json after every stage (LOG-01, SND-03)
+- [ ] 01-03-PLAN.md — Real clients fill the seams: Gemini wrapper (retry, repair, cache), page and Hunter caches, `skeleton` and `smoke` CLI (FND-03, FND-04 offline)
+- [ ] 01-04-PLAN.md — Live proof: owner creates .env, live smoke passes, skeleton dry-run on a real domain, secret scan clean (FND-04 live)
 
 Note: the skeleton's Hunter call goes through a minimal cache-first path so the first live call never burns free-tier quota twice. POC-01 itself (qualified-only gating, filtered query, empty results cached) is delivered and verified in Phase 4.
 
