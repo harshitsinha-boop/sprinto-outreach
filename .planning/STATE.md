@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Runner, CLI and Real Scrape/Extract
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-11-03T10:42:11.548Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-11-03T10:51:51.276Z"
 last_activity: 2026-11-03
 last_activity_desc: Phase 2 execution started
-state_head: 9b30132ab1cf28b98df0f8b9f3c44cc6297a0b18
+state_head: 1c5d2ef0f5d9c1cde171f1869c50b68ae8de6294
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 14
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-03)
 ## Current Position
 
 Phase: 2 (Runner, CLI and Real Scrape/Extract) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-11-03 — Phase 2 execution started
 
@@ -61,6 +61,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase 01 P03 | 6min | 3 tasks | 11 files |
 | Phase 01 P04 | 2 min | 2 tasks | 2 files |
 | Phase 02 P01 | 22 min | 2 tasks | 6 files |
+| Phase 02 P02 | 6min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Hunter Free plan allowance observed live is 50 credits (reset 2026-12-03); set HUNTER_MONTHLY_BUDGET=50 in .env
 - [Phase 02]: Run command defaults to the offline fixture Hunter and a dry run; --live-hunter and --send are explicit opt-ins (batch with failed rows exits 0, systemic abort exits 3)
 - [Phase 02]: Systemic errors (LLM/Hunter auth or quota, SendError) abort the batch; rejected input lines are failed rows at their file position; 25-domain per-run cap
+- [Phase 02]: robots.txt answers are stored on disk only for 2xx and 4xx; 5xx and 429 are transient and retried next run
+- [Phase 02]: Page-cache entries carry GUARD_VERSION; any entry without the current version is re-fetched through every guard
 
 ### Pending Todos
 
@@ -106,6 +109,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T10:42:11.489Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-11-03T10:51:51.211Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None

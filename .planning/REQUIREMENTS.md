@@ -21,8 +21,8 @@
 
 ### Scrape and Extract
 
-- [ ] **SCR-01**: For each domain the system fetches the homepage plus about, careers, security or trust, pricing and customers pages, with timeouts, size caps and robots.txt respected
-- [ ] **SCR-02**: A page with too little usable text or a block signature is marked unavailable and never passed to the LLM
+- [x] **SCR-01**: For each domain the system fetches the homepage plus about, careers, security or trust, pricing and customers pages, with timeouts, size caps and robots.txt respected
+- [x] **SCR-02**: A page with too little usable text or a block signature is marked unavailable and never passed to the LLM
 - [ ] **EXT-01**: The system extracts schema-validated company data (what it sells, B2B or not, stage, headcount, compliance mentions, hiring signals, enterprise customers)
 - [ ] **EXT-02**: Every extracted field is nullable, and every evidence item carries a quote and source URL, with the quote checked as a substring of the fetched text
 - [ ] **EXT-03**: Scraped text is treated as untrusted, delimited in prompts, and never given side-effect tools
@@ -109,8 +109,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUN-02 | Phase 2 | Complete |
 | RUN-03 | Phase 2 | Complete |
 | RUN-04 | Phase 2 | Complete |
-| SCR-01 | Phase 2 | Pending |
-| SCR-02 | Phase 2 | Pending |
+| SCR-01 | Phase 2 | Complete |
+| SCR-02 | Phase 2 | Complete |
 | EXT-01 | Phase 2 | Pending |
 | EXT-02 | Phase 2 | Pending |
 | EXT-03 | Phase 2 | Pending |
