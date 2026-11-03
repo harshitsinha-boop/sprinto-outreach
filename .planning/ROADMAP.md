@@ -37,11 +37,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Running the skeleton on one domain prints the exact email payload (from, to, subject, body) that would be sent, without calling Resend.
   4. After each stage the domain's run record is on disk, so killing the process mid-run still leaves a partial trail to inspect.
   5. A rate-limited or schema-invalid Gemini response is retried or repaired automatically, and running the same domain a second time makes no new Gemini calls.
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 01-01-PLAN.md — Secret hygiene first commit, approved pinned dependencies, typed Settings from .env, secret scanner (FND-01, FND-02)
+- [x] 01-01-PLAN.md — Secret hygiene first commit, approved pinned dependencies, typed Settings from .env, secret scanner (FND-01, FND-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Walking-skeleton tracer: one domain through six stages to a printed owner-addressed dry-run payload, run.json after every stage (LOG-01, SND-03)
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Walking Skeleton | 0/TBD | Not started | - |
+| 1. Foundation and Walking Skeleton | 1/4 | In Progress | - |
 | 2. Runner, CLI and Real Scrape/Extract | 0/TBD | Not started | - |
 | 3. ICP Rubric and Bounded Agent Loop | 0/TBD | Not started | - |
 | 4. PoC Selection | 0/TBD | Not started | - |

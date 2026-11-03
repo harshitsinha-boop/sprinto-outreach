@@ -7,8 +7,8 @@
 
 ### Foundation
 
-- [ ] **FND-01**: `.gitignore` and `.env.example` exist before any secret file, and no API key is ever committed or logged
-- [ ] **FND-02**: User can configure Gemini, Hunter and Resend keys, the owner email and model IDs from a local `.env`
+- [x] **FND-01**: `.gitignore` and `.env.example` exist before any secret file, and no API key is ever committed or logged
+- [x] **FND-02**: User can configure Gemini, Hunter and Resend keys, the owner email and model IDs from a local `.env`
 - [ ] **FND-03**: All Gemini calls go through one wrapper with retry and backoff on 429 and 5xx, a repair retry on schema failure, and response caching
 - [ ] **FND-04**: A smoke test confirms Gemini structured output, one Gemini function-calling round trip, one Hunter call and one Resend send to the owner address work with the configured keys
 
@@ -91,8 +91,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | Phase 1 | Pending |
-| FND-02 | Phase 1 | Pending |
+| FND-01 | Phase 1 | Complete |
+| FND-02 | Phase 1 | Complete |
 | FND-03 | Phase 1 | Pending |
 | FND-04 | Phase 1 | Pending |
 | LOG-01 | Phase 1 | Pending |
