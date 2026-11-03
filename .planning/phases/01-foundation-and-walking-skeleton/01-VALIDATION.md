@@ -29,7 +29,7 @@ created: "2026-11-03"
 
 - **After every task commit:** Run `.venv/bin/python -m pytest -q -x tests/<touched module>`
 - **After every plan wave:** Run `.venv/bin/python -m pytest -q && .venv/bin/python scripts/check_secrets.py`
-- **Before `/gsd-verify-work`:** Full suite green, secret check clean, live `.venv/bin/python -m outreach smoke` reporting five PASS lines (structured on both models, tools, hunter, resend), the smoke email in the owner inbox, and a skeleton dry-run payload on screen
+- **Before `/gsd-verify-work`:** Full suite green, secret check clean, live `.venv/bin/python -m outreach smoke` reporting six PASS lines (structured on both models, tools, hunter_account, hunter, resend), the smoke email in the owner inbox, and a skeleton dry-run payload on screen
 - **Max feedback latency:** 15 seconds
 
 ---
@@ -45,6 +45,7 @@ created: "2026-11-03"
 | 01-01 T3 | FND-02 | Settings load from env and `.env`; missing key names the variable not the value; repr masks | unit | `.venv/bin/python -m pytest tests/test_config.py -x` | ❌ W0 | ⬜ pending |
 | 01-02 T1 | SND-03, LOG-01 | Tracer: 6 ordered stages, dry-run payload printed, no sender call, run.json on disk | e2e | `.venv/bin/python -m pytest tests/test_skeleton_e2e.py -x` | ❌ W0 | ⬜ pending |
 | 01-02 T2 | FND-01 | Canary keys never leak to output, logs, run.json, caches or repr | unit | `.venv/bin/python -m pytest tests/test_skeleton_e2e.py::test_canary_never_leaks -x` | ❌ W0 | ⬜ pending |
+| 01-02 T2 | SND-03, LOG-01 | Mixed pages: a page under MIN_PAGE_CHARS is absent from the extract prompt and the run continues on the usable page | e2e | `.venv/bin/python -m pytest tests/test_skeleton_e2e.py::test_mixed_pages_short_page_excluded_from_extract_prompt -x` | ❌ W0 | ⬜ pending |
 | 01-02 T2 | LOG-01 | `run.json` written after each stage; stage failure keeps prior stages | unit | `.venv/bin/python -m pytest tests/test_audit.py -k per_stage -x` | ❌ W0 | ⬜ pending |
 | 01-02 T2 | LOG-01 | Hard kill leaves valid JSON with earlier stages | subprocess | `.venv/bin/python -m pytest tests/test_audit.py -k hard_kill -x` | ❌ W0 | ⬜ pending |
 | 01-02 T2 | SND-03 | Dry-run prints payload, no Resend call, `to` is the owner, subject shows intended recipient | unit | `.venv/bin/python -m pytest tests/test_send.py -k dry_run -x` | ❌ W0 | ⬜ pending |
@@ -56,9 +57,11 @@ created: "2026-11-03"
 | 01-03 T1 | FND-03 | Wire contract: key header, mime type, thought signature and function response history | contract | `.venv/bin/python -m pytest tests/test_llm.py -k wire -x` | ❌ W0 | ⬜ pending |
 | 01-03 T2 | FND-03 | Page cache: second fetch makes no HTTP; errors not cached; size and text caps | unit | `.venv/bin/python -m pytest tests/test_fetch.py -x` | ❌ W0 | ⬜ pending |
 | 01-03 T2 | FND-04 | Hunter: miss costs 1 live call, hit costs 0, budget blocks, errors not cached, zero results cached | unit | `.venv/bin/python -m pytest tests/test_hunter.py -x` | ❌ W0 | ⬜ pending |
+| 01-03 T2 | FND-04 | FixtureHunter returns its contact only for piedpiper.com; other domains get zero emails | unit | `.venv/bin/python -m pytest tests/test_hunter.py::test_fixture_hunter_returns_contact_only_for_fixture_domain -x` | ❌ W0 | ⬜ pending |
 | 01-03 T3 | FND-04 | Each smoke check passes on a good fake and fails cleanly on a misbehaving one | unit | `.venv/bin/python -m pytest tests/test_smoke.py -x` | ❌ W0 | ⬜ pending |
-| 01-03 T3 | Criteria 3 and 5 | Real clients: rerun makes zero Gemini, page and Hunter calls; CLI prints payload | e2e | `.venv/bin/python -m pytest tests/test_skeleton_e2e.py -x` | ❌ W0 | ⬜ pending |
-| 01-04 T2 | FND-04, FND-01, SND-03 | Live smoke five PASS lines; skeleton rerun free; scanner clean with real keys | live | `out/smoke.log` PASS gate, `.venv/bin/python -m outreach skeleton`, `.venv/bin/python scripts/check_secrets.py` | n/a (needs `.env`) | ⬜ pending |
+| 01-03 T3 | FND-04 | First cheap-check FAIL stops smoke; later checks SKIPPED; no Hunter search, no Resend send | unit | `.venv/bin/python -m pytest tests/test_smoke.py -k skips -x` | ❌ W0 | ⬜ pending |
+| 01-03 T3 | Criteria 3 and 5 | Real clients: rerun makes zero Gemini, page and Hunter calls; CLI prints payload; fixture on a real domain stops no_contact | e2e | `.venv/bin/python -m pytest tests/test_skeleton_e2e.py -x` | ❌ W0 | ⬜ pending |
+| 01-04 T2 | FND-04, FND-01, SND-03 | Live smoke six PASS lines; separate warm-up then free rerun; scanner clean with real keys | live | `out/smoke.log` PASS gate, warm-up `out/skeleton.log` then `.venv/bin/python -m outreach skeleton`, `.venv/bin/python scripts/check_secrets.py` | n/a (needs `.env`) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
