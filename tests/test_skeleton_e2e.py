@@ -13,12 +13,17 @@ import outreach.cli as cli_mod
 from conftest import (
     CANARY_ENV,
     FIXTURE_DIR,
+    INJECTED_PAGE_TEXT,
+    PLANTED_LINES,
     SAMPLE_HTML,
     SAMPLE_PAGE_TEXT,
     FakeFetcher,
     FakeGenaiClient,
     FakeHunter,
+    FakeLLM,
+    FakeSender,
     default_llm_responses,
+    obedient_extract_response,
     text_response,
 )
 from outreach.audit import RunStore
@@ -307,3 +312,41 @@ def test_skeleton_cli_requires_a_domain(ctx, settings, monkeypatch):
 def test_smoke_cli_rejects_unknown_check():
     result = CliRunner().invoke(app, ["smoke", "--only", "bogus"])
     assert result.exit_code == 2
+
+
+def test_planted_instructions_do_not_change_extracted_profile(settings, tmp_path):
+    """Planted instruction lines (hostile fixture text) must leave the validated profile unchanged."""
+
+    def run(label: str, page_text: str, llm: FakeLLM):
+        s = settings.model_copy(
+            update={"cache_dir": tmp_path / label / ".cache", "out_dir": tmp_path / label / "out"}
+        )
+        c = Context(
+            settings=s,
+            llm=llm,
+            hunter=FakeHunter(),
+            fetcher=FakeFetcher(page_text),
+            store=RunStore(s.out_dir),
+            dry_run=True,
+            sender=FakeSender(),
+            out=io.StringIO(),
+        )
+        rec = run_one(DOMAIN, c)
+        assert rec.status == "dry_run"
+        data = json.loads(c.store.path_for(DOMAIN).read_text())
+        return next(st for st in data["stages"] if st["name"] == "extract")["output"]
+
+    clean_llm = FakeLLM()
+    injected_responses = default_llm_responses()
+    injected_responses["extract"] = obedient_extract_response()
+    injected_llm = FakeLLM(injected_responses)
+
+    clean = run("clean", SAMPLE_PAGE_TEXT, clean_llm)
+    injected = run("injected", INJECTED_PAGE_TEXT, injected_llm)
+
+    assert injected["profile"] == clean["profile"]
+    assert injected["injection_suspected_pages"] == ["https://example.com/"]
+    assert clean["injection_suspected_pages"] == []
+    prompt = next(c for c in injected_llm.calls if c["purpose"] == "extract")["prompt"]
+    for line in PLANTED_LINES:
+        assert line not in prompt

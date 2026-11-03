@@ -30,7 +30,7 @@ from outreach.llm import (
     build_config,
     gemini_schema,
 )
-from outreach.models import CompanyProfileLite, EmailDraft
+from outreach.models import CompanyProfile, EmailDraft
 
 KEY = CANARY_ENV["GEMINI_API_KEY"]
 MODEL = "gemini-3.5-flash-lite"
@@ -240,7 +240,7 @@ def test_cache_survives_a_new_client_instance(fake_sleep, tmp_path):
     [
         {"model": "gemini-3.8-flash"},
         {"prompt": "other prompt"},
-        {"schema": CompanyProfileLite},
+        {"schema": CompanyProfile},
         {"prompt_version": "2"},
         {"system": "other system"},
         {"thinking_level": "LOW"},
@@ -249,15 +249,17 @@ def test_cache_survives_a_new_client_instance(fake_sleep, tmp_path):
 def test_cache_key_changes_with_inputs(fake_sleep, tmp_path, over):
     cache = tmp_path / "llm"
     other_text = (
-        CompanyProfileLite(
+        CompanyProfile(
             name=None,
-            is_b2b_saas=None,
-            headcount_band=None,
+            offering=None,
+            is_b2b=None,
+            stage=None,
+            headcount=None,
             compliance_mentions=[],
             hiring_signals=[],
-            enterprise_customer_signals=[],
+            enterprise_customers=[],
         ).model_dump_json()
-        if over.get("schema") is CompanyProfileLite
+        if over.get("schema") is CompanyProfile
         else VALID_JSON
     )
     c = make([text_response(VALID_JSON), text_response(other_text)], fake_sleep, cache_dir=cache)
@@ -288,7 +290,7 @@ def _all_keys(node):
 
 
 def test_config_never_sets_sampling_params_and_disables_sdk_retries():
-    cfg = build_config(system="s", schema=CompanyProfileLite, max_output_tokens=123, thinking_level=None)
+    cfg = build_config(system="s", schema=CompanyProfile, max_output_tokens=123, thinking_level=None)
     assert cfg.temperature is None and cfg.top_p is None and cfg.top_k is None
     assert cfg.http_options.retry_options.attempts == 1
     assert cfg.response_mime_type == "application/json"
@@ -298,14 +300,14 @@ def test_config_never_sets_sampling_params_and_disables_sdk_retries():
 
 
 def test_config_schema_has_no_default_keys():
-    schema = gemini_schema(CompanyProfileLite)
+    schema = gemini_schema(CompanyProfile)
     assert "default" not in set(_all_keys(schema))
     # a model that does declare defaults is stripped too
     from outreach.models import ScoreBreakdown
 
     assert "default" in set(_all_keys(ScoreBreakdown.model_json_schema()))
     assert "default" not in set(_all_keys(gemini_schema(ScoreBreakdown)))
-    cfg = build_config(system="s", schema=CompanyProfileLite, max_output_tokens=10, thinking_level=None)
+    cfg = build_config(system="s", schema=CompanyProfile, max_output_tokens=10, thinking_level=None)
     assert "default" not in set(_all_keys(cfg.response_json_schema))
 
 
@@ -323,8 +325,8 @@ def test_config_thinking_flag_off_omits_thinking_config(monkeypatch):
 
 def test_config_response_schema_fallback_passes_the_class(monkeypatch):
     monkeypatch.setattr(llm_mod, "USE_RESPONSE_JSON_SCHEMA", False)
-    cfg = build_config(system="s", schema=CompanyProfileLite, max_output_tokens=10, thinking_level=None)
-    assert cfg.response_schema is CompanyProfileLite
+    cfg = build_config(system="s", schema=CompanyProfile, max_output_tokens=10, thinking_level=None)
+    assert cfg.response_schema is CompanyProfile
     assert cfg.response_json_schema is None
 
 
