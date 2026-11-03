@@ -9,6 +9,7 @@ cache key and break "second run makes no new Gemini calls".
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
@@ -25,6 +26,8 @@ from outreach.models import (
     ScrapeOutput,
     SendResult,
 )
+from outreach.pagegate import MIN_PAGE_CHARS, is_usable, page_gate
+from outreach.scrape import scrape_domain
 from outreach.send import send_email
 
 if TYPE_CHECKING:  # avoid an import cycle with skeleton.py
@@ -45,8 +48,6 @@ class DomainUnreachable(Exception):
     failure, never a StopStage: the batch records the domain as `failed` and carries on."""
 
 
-SKELETON_PATHS = ("/", "/about")
-MIN_PAGE_CHARS = 400
 MAX_PAGE_CHARS = 8000
 SIMPLE_SCORE_WEIGHTS = {
     "is_b2b_saas": 40,
@@ -77,8 +78,9 @@ DRAFT_SYSTEM = (
 
 
 def usable_pages(pages: list[PageResult]) -> list[PageResult]:
-    """The single usability filter: status ok and at least MIN_PAGE_CHARS of text."""
-    return [p for p in pages if p.status == "ok" and p.text and p.chars >= MIN_PAGE_CHARS]
+    """The single usability filter, applied at the extract call site for any fetcher: status ok,
+    at least MIN_PAGE_CHARS of text and no block or challenge signature (`pagegate.is_usable`)."""
+    return [p for p in pages if is_usable(p)]
 
 
 def build_extract_prompt(pages: list[PageResult]) -> str:
@@ -151,14 +153,19 @@ def pick_contact(result: dict) -> HunterContact | None:
     )
 
 
+def _page_reason(page: PageResult) -> str:
+    return page.reason or page_gate(page.text) or page.status
+
+
 def stage_scrape(ctx: Context, domain: str, prev: dict) -> ScrapeOutput:
-    pages = [ctx.fetcher.fetch(f"https://{domain}{path}") for path in SKELETON_PATHS]
-    usable = len(usable_pages(pages))
-    if usable == 0:
-        if pages and all(p.status == "error" for p in pages):
-            raise DomainUnreachable(f"all {len(pages)} fetches failed: {pages[0].error}")
-        raise StopStage("insufficient_data", f"no page reached {MIN_PAGE_CHARS} usable characters")
-    return ScrapeOutput(pages=pages, usable=usable)
+    out = scrape_domain(ctx.fetcher, domain)
+    if out.usable == 0:
+        if out.pages and all(p.status == "error" for p in out.pages):
+            raise DomainUnreachable(f"all {len(out.pages)} fetches failed: {out.pages[0].error}")
+        counts = Counter(_page_reason(p) for p in out.pages)
+        breakdown = ", ".join(f"{reason}={n}" for reason, n in sorted(counts.items()))
+        raise StopStage("insufficient_data", f"0 usable of {len(out.pages)} pages ({breakdown})")
+    return out
 
 
 def stage_extract(ctx: Context, domain: str, prev: dict) -> ExtractOutput:

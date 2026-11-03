@@ -49,7 +49,9 @@ class ThinOrOkFetcher:
 
     def fetch(self, url, site=None):
         self.calls.append(url)
-        text = "x" * 30 if urlparse(url).hostname in self.thin else SAMPLE_PAGE_TEXT
+        host = urlparse(url).hostname or ""
+        thin = any(host == n or host.endswith("." + n) for n in self.thin)
+        text = "x" * 30 if thin else SAMPLE_PAGE_TEXT
         return PageResult(url=url, status="ok", text=text, chars=len(text))
 
 

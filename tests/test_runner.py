@@ -31,6 +31,12 @@ def _ok(url: str, text: str = SAMPLE_PAGE_TEXT) -> PageResult:
     return PageResult(url=url, status="ok", text=text, chars=len(text))
 
 
+def _in(host: str | None, names: set[str]) -> bool:
+    """True when `host` is one of `names` or a subdomain of one (the scraper also asks for
+    trust.<domain>, which belongs to the same site)."""
+    return any(host == n or (host or "").endswith("." + n) for n in names)
+
+
 class RoutingFetcher:
     """Per-host behaviour: dead hosts error at transport level, boom hosts raise, thin hosts
     return a short page, everything else returns the sample page."""
@@ -38,15 +44,17 @@ class RoutingFetcher:
     def __init__(self, *, dead=(), boom=(), thin=()):
         self.dead, self.boom, self.thin = set(dead), set(boom), set(thin)
         self.calls: list[str] = []
+        self.scopes: set[str] = set()  # the input domains the scraper asked about
 
     def fetch(self, url, site=None):
         self.calls.append(url)
         host = urlparse(url).hostname
-        if host in self.dead:
+        self.scopes.add(site or host)
+        if _in(host, self.dead):
             return PageResult(url=url, status="error", error="ConnectError: dns failure")
-        if host in self.boom:
+        if _in(host, self.boom):
             raise RuntimeError(f"boom on {host}")
-        if host in self.thin:
+        if _in(host, self.thin):
             return _ok(url, "x" * 30)
         return _ok(url)
 
@@ -177,7 +185,7 @@ def test_systemic_error_aborts_batch(ctx, exc):
         assert row.outcome == "failed"
         assert row.detail == "not run (batch aborted)"
         assert row.run_record is None
-    assert fetcher.hosts() == {"a.example"}
+    assert fetcher.scopes == {"a.example"}
     assert summary.counts["failed"] == 3
 
 
@@ -272,7 +280,7 @@ def test_invalid_domain_lines_are_failed_rows(ctx, tmp_path):
     fetcher = RoutingFetcher()
     ctx.fetcher = fetcher
     summary = run_batch(entries, ctx)
-    assert fetcher.hosts() == {"good.example"}
+    assert fetcher.scopes == {"good.example"}
     assert summary.rows[-1].domain == "good.example"
     assert summary.rows[-1].outcome == "qualified"
     assert summary.counts["failed"] == 5

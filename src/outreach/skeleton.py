@@ -51,7 +51,7 @@ class HunterLike(Protocol):
 
 
 class FetcherLike(Protocol):
-    def fetch(self, url: str) -> PageResult: ...
+    def fetch(self, url: str, site: str | None = None) -> PageResult: ...
 
 
 @dataclass

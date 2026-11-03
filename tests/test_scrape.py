@@ -147,7 +147,7 @@ def test_duplicate_content_is_marked_unavailable():
     assert out.fetches == len(out.pages) == 13
 
 
-def test_attempt_and_fetch_caps_hold(monkeypatch):
+def test_attempt_and_fetch_caps_hold():
     many = [Link(url=f"https://example.com/about-{i}", text="About") for i in range(10)]
     fetcher = ScriptedFetcher({HOME: ok(HOME, links=many)})  # every other page is a 404
 
@@ -156,16 +156,25 @@ def test_attempt_and_fetch_caps_hold(monkeypatch):
     per_kind = {k: sum(1 for p in out.pages if p.kind == k) for k in KINDS[1:]}
     assert max(per_kind.values()) <= scrape_mod.MAX_ATTEMPTS_PER_KIND == 3
     assert out.fetches <= scrape_mod.MAX_FETCHES_PER_DOMAIN == 14 and out.usable == 1
+    assert out.fetches == len(out.pages) == len(fetcher.calls)
 
+
+def test_fetch_cap_stops_discovery_and_lists_skipped_kinds(monkeypatch):
     monkeypatch.setattr(scrape_mod, "MAX_FETCHES_PER_DOMAIN", 5)
-    capped_fetcher = ScriptedFetcher({HOME: ok(HOME)})
-    capped = scrape_mod.scrape_domain(capped_fetcher, DOMAIN)
-    assert capped.fetches == 5 == len(capped_fetcher.calls)
-    assert capped.skipped_kinds  # the kinds never reached are listed
+    fetcher = ScriptedFetcher({HOME: ok(HOME)})
 
+    out = scrape_mod.scrape_domain(fetcher, DOMAIN)
+
+    assert out.fetches == 5 == len(fetcher.calls)
+    assert out.skipped_kinds == ["security", "pricing", "customers"]
+
+
+def test_attempt_cap_is_per_kind(monkeypatch):
     monkeypatch.setattr(scrape_mod, "MAX_ATTEMPTS_PER_KIND", 1)
-    single = scrape_mod.scrape_domain(ScriptedFetcher({HOME: ok(HOME)}), DOMAIN)
-    assert [sum(1 for p in single.pages if p.kind == k) for k in KINDS[1:]] == [1, 1, 1, 1, 1]
+
+    out = scrape_mod.scrape_domain(ScriptedFetcher({HOME: ok(HOME)}), DOMAIN)
+
+    assert [sum(1 for p in out.pages if p.kind == k) for k in KINDS[1:]] == [1, 1, 1, 1, 1]
 
 
 def test_time_budget_skips_remaining_kinds():
