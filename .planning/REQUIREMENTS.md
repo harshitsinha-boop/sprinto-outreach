@@ -53,11 +53,11 @@
 
 - [ ] **SND-01**: The email is sent through Resend from onboarding@resend.dev, with the recipient forced to the owner email inside the send function
 - [ ] **SND-02**: The subject shows the intended recipient, and the send checks for a returned message id and uses an idempotency key
-- [ ] **SND-03**: A dry-run prints the exact payload that would be sent without calling Resend
+- [x] **SND-03**: A dry-run prints the exact payload that would be sent without calling Resend
 
 ### Decision Log and Demo
 
-- [ ] **LOG-01**: Every company gets a record written after each stage, so a crash still leaves a partial trail
+- [x] **LOG-01**: Every company gets a record written after each stage, so a crash still leaves a partial trail
 - [ ] **LOG-02**: A readable decision log explains why the company qualified, why this person, and why the email was written this way, including a hook-to-evidence map
 - [ ] **LOG-03**: A `--replay` mode re-runs from cached responses with no network calls
 - [ ] **LOG-04**: A demo set of 5 to 8 domains (fits, non-fits, an unscrapeable site, a no-contact case) is run, with sample output saved
@@ -95,8 +95,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FND-02 | Phase 1 | Complete |
 | FND-03 | Phase 1 | Pending |
 | FND-04 | Phase 1 | Pending |
-| LOG-01 | Phase 1 | Pending |
-| SND-03 | Phase 1 | Pending |
+| LOG-01 | Phase 1 | Complete |
+| SND-03 | Phase 1 | Complete |
 | RUN-01 | Phase 2 | Pending |
 | RUN-02 | Phase 2 | Pending |
 | RUN-03 | Phase 2 | Pending |
