@@ -40,9 +40,16 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 4 plans
 
 Plans:
+**Wave 1**
 - [ ] 01-01-PLAN.md — Secret hygiene first commit, approved pinned dependencies, typed Settings from .env, secret scanner (FND-01, FND-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Walking-skeleton tracer: one domain through six stages to a printed owner-addressed dry-run payload, run.json after every stage (LOG-01, SND-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 01-03-PLAN.md — Real clients fill the seams: Gemini wrapper (retry, repair, cache), page and Hunter caches, `skeleton` and `smoke` CLI (FND-03, FND-04 offline)
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-04-PLAN.md — Live proof: owner creates .env, live smoke passes, skeleton dry-run on a real domain, secret scan clean (FND-04 live)
 
 Note: the skeleton's Hunter call goes through a minimal cache-first path so the first live call never burns free-tier quota twice. POC-01 itself (qualified-only gating, filtered query, empty results cached) is delivered and verified in Phase 4.
