@@ -155,7 +155,7 @@ Tracer verified end-to-end (CLI tracer test plus full suite re-run) before expan
 
 None - plan executed exactly as written.
 
-One small addition inside plan scope: `metavar="DOMAINS_FILE"` on the Typer argument, because Typer otherwise renders the placeholder as `{domains_file}` and the acceptance criterion greps for `DOMAINS_FILE`. Also four extra tests beyond the named ones (`test_systemic_errors_are_the_five_documented_types`, `test_thin_page_is_insufficient_data_not_failed` was named; `test_run_cli_abort_output_never_contains_the_key` and `test_run_cli_reports_invalid_lines_in_banner_and_table` are additions) covering CLI-level redaction and the invalid-line banner.
+One small addition inside plan scope: `metavar="DOMAINS_FILE"` on the Typer argument, because Typer otherwise renders the placeholder as `{domains_file}` and the acceptance criterion greps for `DOMAINS_FILE`. Three extra tests beyond the named ones: `test_systemic_errors_are_the_five_documented_types`, `test_run_cli_abort_output_never_contains_the_key` (CLI-level redaction) and `test_run_cli_reports_invalid_lines_in_banner_and_table` (the `invalid: N` banner part).
 
 **Total deviations:** 0 auto-fixed. **Impact:** none.
 

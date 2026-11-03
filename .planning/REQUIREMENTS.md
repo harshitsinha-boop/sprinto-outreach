@@ -14,10 +14,10 @@
 
 ### Runner
 
-- [ ] **RUN-01**: User can run the pipeline on a text file of domains with one command and no decisions between steps
-- [ ] **RUN-02**: A failure on one domain is recorded and does not stop the batch, and a systemic failure such as a bad API key aborts the batch
-- [ ] **RUN-03**: Dry-run is the default, and a live send needs an explicit `--send` flag
-- [ ] **RUN-04**: A summary table shows each domain's outcome (qualified, disqualified, insufficient data, no contact, rejected draft, sent, failed)
+- [x] **RUN-01**: User can run the pipeline on a text file of domains with one command and no decisions between steps
+- [x] **RUN-02**: A failure on one domain is recorded and does not stop the batch, and a systemic failure such as a bad API key aborts the batch
+- [x] **RUN-03**: Dry-run is the default, and a live send needs an explicit `--send` flag
+- [x] **RUN-04**: A summary table shows each domain's outcome (qualified, disqualified, insufficient data, no contact, rejected draft, sent, failed)
 
 ### Scrape and Extract
 
@@ -105,10 +105,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FND-04 | Phase 1 | Complete |
 | LOG-01 | Phase 1 | Complete |
 | SND-03 | Phase 1 | Complete |
-| RUN-01 | Phase 2 | Pending |
-| RUN-02 | Phase 2 | Pending |
-| RUN-03 | Phase 2 | Pending |
-| RUN-04 | Phase 2 | Pending |
+| RUN-01 | Phase 2 | Complete |
+| RUN-02 | Phase 2 | Complete |
+| RUN-03 | Phase 2 | Complete |
+| RUN-04 | Phase 2 | Complete |
 | SCR-01 | Phase 2 | Pending |
 | SCR-02 | Phase 2 | Pending |
 | EXT-01 | Phase 2 | Pending |
