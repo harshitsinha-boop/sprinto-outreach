@@ -56,9 +56,79 @@ def canonical_url(u: str) -> str:
     return u.rstrip("/")
 
 
+# Imperative, second-person instructions aimed at an assistant. Descriptive company copy such as
+# "You are a leader in AI-driven compliance" or "Ignore the noise: ..." must never match, so each
+# shape is narrow: no bare verbs, and every shape needs its full phrase.
+_I = re.IGNORECASE
+INJECTION_PATTERNS = (
+    # (a) ignore / disregard [all|any|the|your] previous|prior|above|earlier|system instructions|...
+    re.compile(
+        r"\b(?:ignore|disregard)\s+(?:(?:all|any|the|your)\s+)*"
+        r"(?:previous|prior|above|earlier|system)\s+(?:instructions?|prompts?|rules|messages?)\b",
+        _I,
+    ),
+    # (b) "you must now", "from now on you must|will|should|are"
+    re.compile(r"\byou\s+must\s+now\b", _I),
+    re.compile(r"\bfrom\s+now\s+on,?\s+you\s+(?:must|will|should|are)\b", _I),
+    # (c) "you are now [a|an|the|my] assistant|AI|chatbot|bot|agent|LLM|language model"
+    re.compile(
+        r"\byou\s+are\s+now\s+(?:(?:a|an|the|my)\s+)?"
+        r"(?:assistant|ai|chatbot|bot|agent|llm|language\s+model)\b",
+        _I,
+    ),
+    # (d) reveal|print|repeat|output|show|leak your|the system|hidden|developer|original prompt
+    re.compile(
+        r"\b(?:reveal|print|repeat|output|show|leak)\s+(?:your|the)\s+"
+        r"(?:system|hidden|developer|original)\s+(?:prompt|instructions?|message)\b",
+        _I,
+    ),
+    # (e) a line that starts with a chat-role label
+    re.compile(
+        r"^\s*(?:(?:system|developer)\s+prompt\s*:"
+        r"|\[?\s*(?:system|assistant|developer)\s*\]?\s*:\s*(?:you|ignore|disregard|from\s+now\s+on)\b)",
+        _I,
+    ),
+    # (f) the exact phrase
+    re.compile(r"\bas\s+an\s+ai\s+language\s+model\b", _I),
+    # (g) "new instructions:" and its siblings, with the colon
+    re.compile(r"\b(?:new|updated|revised)\s+instructions\s*:", _I),
+    # (h) tag-like text that opens or closes a page, system or instructions tag
+    re.compile(r"<\s*/?\s*(?:page|system|instructions?)\b", _I),
+)
+
+_PAGE_TAG = re.compile(r"<(/?page)", re.IGNORECASE)
+
+
+def is_instruction_line(line: str) -> bool:
+    return any(pattern.search(line) for pattern in INJECTION_PATTERNS)
+
+
+def strip_instruction_lines(text: str) -> tuple[str, int]:
+    """Replace each instruction-like line with an empty line. Returns the text and the count."""
+    out: list[str] = []
+    removed = 0
+    for line in text.split("\n"):
+        if is_instruction_line(line):
+            out.append("")
+            removed += 1
+        else:
+            out.append(line)
+    return "\n".join(out), removed
+
+
+def escape_page_tags(text: str) -> str:
+    """Escape every opening `<page` and closing `</page` so text can neither end its own block
+    nor open a fake one."""
+    return _PAGE_TAG.sub(r"&lt;\1", text)
+
+
+def _clipped(page: PageResult) -> str:
+    return (page.text or "")[:MAX_PAGE_CHARS]
+
+
 def prompt_text(page: PageResult) -> str:
     """The exact text the model sees for a page. Validation compares against this same text."""
-    return (page.text or "")[:MAX_PAGE_CHARS]
+    return escape_page_tags(strip_instruction_lines(_clipped(page))[0])
 
 
 def _attr(value: str | None) -> str:
@@ -91,8 +161,14 @@ def _lookup(pages: list[PageResult]) -> dict[str, PageResult]:
     return by_url
 
 
-def _in_page(snippet: str, page: PageResult) -> bool:
-    return normalize_ws(snippet) in normalize_ws(prompt_text(page))
+def _locate(snippet: str, page: PageResult) -> str | None:
+    """None when the snippet is in the text the model saw; else why it is not."""
+    wanted = normalize_ws(snippet)
+    if wanted in normalize_ws(prompt_text(page)):
+        return None
+    if wanted in normalize_ws(_clipped(page)):
+        return "instruction_like_text"  # only on a removed or escaped line
+    return "quote_not_on_page"
 
 
 def _item_reason(item, by_url: dict[str, PageResult]) -> str | None:
@@ -102,9 +178,7 @@ def _item_reason(item, by_url: dict[str, PageResult]) -> str | None:
     quote = item.quote.strip()
     if len(quote) < MIN_QUOTE_CHARS:
         return "quote_too_short"
-    if not _in_page(quote, page):
-        return "quote_not_on_page"
-    return None
+    return _locate(quote, page)
 
 
 def _drop(field: str, item, reason: str) -> DroppedEvidence:
@@ -119,9 +193,12 @@ def _check_as_of(item, field: str, by_url, drops: list[DroppedEvidence]):
     if as_of is None:
         return item
     page = by_url[canonical_url(item.source_url)]
-    if as_of.strip() and _in_page(as_of, page):
+    reason = _locate(as_of, page) if as_of.strip() else "as_of_not_on_page"
+    if reason is None:
         return item
-    drops.append(_drop(f"{field}.as_of", item, "as_of_not_on_page"))
+    if reason == "quote_not_on_page":
+        reason = "as_of_not_on_page"
+    drops.append(_drop(f"{field}.as_of", item, reason))
     return item.model_copy(update={"as_of": None})
 
 
@@ -174,11 +251,14 @@ def extract_profile(llm: LLMLike, model: str, pages: list[PageResult]) -> Extrac
         prompt_version=EXTRACT_PROMPT_VERSION,
     )
     profile, drops, checked = validate_profile(raw, pages)
-    dropped_items = sum(1 for d in drops if d.reason != "as_of_not_on_page")
+    dropped_items = sum(1 for d in drops if not d.field.endswith(".as_of"))
     return ExtractOutput(
         profile=profile,
         pages_used=[p.url for p in pages],
         evidence_total=checked,
         evidence_kept=checked - dropped_items,
         evidence_dropped=drops,
+        injection_suspected_pages=[
+            p.url for p in pages if strip_instruction_lines(_clipped(p))[1] > 0
+        ],
     )

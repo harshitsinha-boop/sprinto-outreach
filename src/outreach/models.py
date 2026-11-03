@@ -43,15 +43,6 @@ class ScrapeOutput(BaseModel):
     skipped_kinds: list[str] = Field(default_factory=list)
 
 
-class CompanyProfileLite(BaseModel):
-    name: str | None
-    is_b2b_saas: bool | None
-    headcount_band: str | None
-    compliance_mentions: list[Evidence]
-    hiring_signals: list[Evidence]
-    enterprise_customer_signals: list[Evidence]
-
-
 class EvidencedText(BaseModel):
     value: str
     quote: str
