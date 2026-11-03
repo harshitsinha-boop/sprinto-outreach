@@ -52,10 +52,90 @@ class CompanyProfileLite(BaseModel):
     enterprise_customer_signals: list[Evidence]
 
 
+class EvidencedText(BaseModel):
+    value: str
+    quote: str
+    source_url: str
+
+
+class EvidencedBool(BaseModel):
+    value: bool
+    quote: str
+    source_url: str
+
+
+class StageFact(BaseModel):
+    value: Literal[
+        "pre_seed",
+        "seed",
+        "series_a",
+        "series_b",
+        "series_c",
+        "series_d_or_later",
+        "public",
+        "bootstrapped",
+    ]
+    as_of: str | None
+    quote: str
+    source_url: str
+
+
+class HeadcountFact(BaseModel):
+    value: Literal["1-10", "11-50", "51-200", "201-500", "501-1000", "1001+"]
+    quote: str
+    source_url: str
+
+
+class ComplianceMention(BaseModel):
+    framework: str
+    status: Literal["certified", "in_progress", "planned", "mentioned"]
+    as_of: str | None
+    quote: str
+    source_url: str
+
+
+class HiringSignal(BaseModel):
+    role: str
+    quote: str
+    source_url: str
+
+
+class EnterpriseCustomer(BaseModel):
+    name: str
+    quote: str
+    source_url: str
+
+
+class CompanyProfile(BaseModel):
+    """What the pages state about a company, each value with its own quote and page url.
+
+    No defaults: every field is required in the schema, so the model must say null or [].
+    `is_b2b` is tri-state by construction (true, false, or null when unknown)."""
+
+    name: EvidencedText | None
+    offering: EvidencedText | None
+    is_b2b: EvidencedBool | None
+    stage: StageFact | None
+    headcount: HeadcountFact | None
+    compliance_mentions: list[ComplianceMention]
+    hiring_signals: list[HiringSignal]
+    enterprise_customers: list[EnterpriseCustomer]
+
+
+class DroppedEvidence(BaseModel):
+    field: str
+    quote: str
+    source_url: str
+    reason: str
+
+
 class ExtractOutput(BaseModel):
-    profile: CompanyProfileLite
-    quotes_total: int
-    quotes_found_in_text: int
+    profile: CompanyProfile
+    pages_used: list[str]
+    evidence_total: int
+    evidence_kept: int
+    evidence_dropped: list[DroppedEvidence] = Field(default_factory=list)
+    injection_suspected_pages: list[str] = Field(default_factory=list)
 
 
 class ScoreItem(BaseModel):

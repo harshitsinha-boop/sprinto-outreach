@@ -139,7 +139,7 @@ def test_mixed_pages_short_page_excluded_from_extract_prompt(ctx, fake_llm):
     assert rec.status == "dry_run"
     assert rec.stages[0].output["usable"] == 1
     extract_call = next(c for c in fake_llm.calls if c["purpose"] == "extract")
-    assert '<page url="https://example.com/">' in extract_call["prompt"]
+    assert '<page url="https://example.com/" kind="home">' in extract_call["prompt"]
     assert "https://example.com/about" not in extract_call["prompt"]
     assert short not in extract_call["prompt"]
 

@@ -17,7 +17,17 @@ from google.genai import errors, types
 import outreach.fetch
 from outreach.audit import RunStore
 from outreach.config import load_settings
-from outreach.models import CompanyProfileLite, EmailDraft, Evidence, PageResult
+from outreach.models import (
+    CompanyProfile,
+    ComplianceMention,
+    EmailDraft,
+    EnterpriseCustomer,
+    EvidencedBool,
+    EvidencedText,
+    HeadcountFact,
+    HiringSignal,
+    PageResult,
+)
 from outreach.skeleton import Context
 
 CANARY_ENV = {
@@ -54,6 +64,9 @@ SAMPLE_HTML = (
     + "</body></html>"
 )
 
+QUOTE_NAME = "Acme Ledger is a B2B SaaS platform"
+QUOTE_OFFERING = "automates accounts payable for finance teams"
+QUOTE_HEADCOUNT = "We are a team of about 80 people"
 QUOTE_SOC2 = "working toward SOC 2 Type II certification"
 QUOTE_CUSTOMERS = "Northwind Logistics, Contoso Freight and Globex Manufacturing"
 QUOTE_HIRING = "We are hiring a Security Engineer"
@@ -62,13 +75,30 @@ HOME_URL = "https://example.com/"
 
 def default_llm_responses() -> dict:
     return {
-        "extract": CompanyProfileLite(
-            name="Acme Ledger",
-            is_b2b_saas=True,
-            headcount_band="51-200",
-            compliance_mentions=[Evidence(quote=QUOTE_SOC2, source_url=HOME_URL)],
-            hiring_signals=[Evidence(quote=QUOTE_HIRING, source_url=HOME_URL)],
-            enterprise_customer_signals=[Evidence(quote=QUOTE_CUSTOMERS, source_url=HOME_URL)],
+        "extract": CompanyProfile(
+            name=EvidencedText(value="Acme Ledger", quote=QUOTE_NAME, source_url=HOME_URL),
+            offering=EvidencedText(
+                value="accounts payable automation", quote=QUOTE_OFFERING, source_url=HOME_URL
+            ),
+            is_b2b=EvidencedBool(value=True, quote=QUOTE_NAME, source_url=HOME_URL),
+            stage=None,
+            headcount=HeadcountFact(value="51-200", quote=QUOTE_HEADCOUNT, source_url=HOME_URL),
+            compliance_mentions=[
+                ComplianceMention(
+                    framework="SOC 2",
+                    status="in_progress",
+                    as_of=None,
+                    quote=QUOTE_SOC2,
+                    source_url=HOME_URL,
+                )
+            ],
+            hiring_signals=[
+                HiringSignal(role="Security Engineer", quote=QUOTE_HIRING, source_url=HOME_URL)
+            ],
+            enterprise_customers=[
+                EnterpriseCustomer(name=name, quote=QUOTE_CUSTOMERS, source_url=HOME_URL)
+                for name in ("Northwind Logistics", "Contoso Freight", "Globex Manufacturing")
+            ],
         ),
         "draft": EmailDraft(
             subject="Your SOC 2 Type II timeline",

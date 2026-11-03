@@ -247,7 +247,7 @@ def test_only_usable_pages_reach_extract_prompt(ctx):
 
     assert summary.rows[0].outcome == "qualified"
     extract = next(c for c in ctx.llm.calls if c["purpose"] == "extract")
-    assert f'<page url="{HOME}">' in extract["prompt"]
+    assert f'<page url="{HOME}" kind="home">' in extract["prompt"]
     assert pricing not in extract["prompt"]
     assert "verify you are human" not in extract["prompt"]
 
