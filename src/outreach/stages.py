@@ -159,7 +159,7 @@ def stage_extract(ctx: Context, domain: str, prev: dict) -> ExtractOutput:
     profile = ctx.llm.generate_structured(
         model=ctx.settings.gemini_model_fast,
         system=EXTRACT_SYSTEM,
-        prompt=build_extract_prompt(good),
+        prompt=build_extract_prompt(usable_pages(prev["scrape"].pages)),
         schema=CompanyProfileLite,
         purpose="extract",
         prompt_version=EXTRACT_PROMPT_VERSION,
