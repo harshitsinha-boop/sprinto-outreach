@@ -17,6 +17,11 @@ class Evidence(BaseModel):
     source_url: str
 
 
+class Link(BaseModel):
+    url: str
+    text: str = ""
+
+
 class PageResult(BaseModel):
     url: str
     status: Literal["ok", "unavailable", "error"]
@@ -24,11 +29,18 @@ class PageResult(BaseModel):
     chars: int = 0
     error: str | None = None
     from_cache: bool = False
+    kind: str | None = None
+    reason: str | None = None
+    final_url: str | None = None
+    links: list[Link] = Field(default_factory=list)
 
 
 class ScrapeOutput(BaseModel):
     pages: list[PageResult]
     usable: int
+    kinds_found: list[str] = Field(default_factory=list)
+    fetches: int = 0
+    skipped_kinds: list[str] = Field(default_factory=list)
 
 
 class CompanyProfileLite(BaseModel):

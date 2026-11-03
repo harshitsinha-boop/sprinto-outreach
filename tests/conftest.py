@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 from google.genai import errors, types
 
+import outreach.fetch
 from outreach.audit import RunStore
 from outreach.config import load_settings
 from outreach.models import CompanyProfileLite, EmailDraft, Evidence, PageResult
@@ -28,6 +29,9 @@ CANARY_ENV = {
 }
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+# The real resolver, captured before the autouse fixture below replaces it for every test.
+ORIGINAL_SYSTEM_RESOLVE = outreach.fetch._system_resolve
 
 SAMPLE_SENTENCES = [
     "Acme Ledger is a B2B SaaS platform that automates accounts payable for finance "
@@ -155,7 +159,7 @@ class FakeFetcher:
         self.by_url = by_url or {}
         self.calls: list[str] = []
 
-    def fetch(self, url: str) -> PageResult:
+    def fetch(self, url: str, site=None) -> PageResult:
         self.calls.append(url)
         text = self.by_url.get(url, self.text)
         return PageResult(url=url, status="ok", text=text, chars=len(text))
@@ -239,6 +243,13 @@ def api_error(code: int, status: str, message: str = "error", retry_delay=None):
 
 
 # ---- fixtures ----
+
+
+@pytest.fixture(autouse=True)
+def _offline_network_defaults(monkeypatch):
+    """No test performs a real DNS lookup or sleeps for the politeness interval."""
+    monkeypatch.setattr(outreach.fetch, "_system_resolve", lambda host: ["93.184.216.34"])
+    monkeypatch.setattr(outreach.fetch, "POLITE_INTERVAL_S", 0.0)
 
 
 @pytest.fixture

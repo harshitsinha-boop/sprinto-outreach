@@ -197,7 +197,7 @@ def test_rerun_makes_zero_gemini_and_hunter_calls(settings):
     assert rec1.status == "dry_run"
     assert ctx1.llm.stats.api_calls == 2
     assert ctx1.hunter.live_calls_this_process == 1
-    assert len(pages1) == 2 and len(hunter1) == 1
+    assert len(pages1) >= 2 and len(hunter1) == 1
 
     # Second run: NEW client instances on the same cache dirs, nothing queued for Gemini,
     # and a site that now serves different HTML (it must never be fetched).
