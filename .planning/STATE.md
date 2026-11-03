@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Runner, CLI and Real Scrape/Extract
-status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-11-03T10:51:51.276Z"
+status: verifying
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-11-03T10:56:26.215Z"
 last_activity: 2026-11-03
 last_activity_desc: Phase 2 execution started
-state_head: 1c5d2ef0f5d9c1cde171f1869c50b68ae8de6294
+state_head: 3384f27dfd82a146bb961a1a743eb66269f94e6c
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 14
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-11-03)
 
 Phase: 2 (Runner, CLI and Real Scrape/Extract) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-11-03 — Phase 2 execution started
 
 Progress: [█░░░░░░░░░] 14%
@@ -62,6 +62,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase 01 P04 | 2 min | 2 tasks | 2 files |
 | Phase 02 P01 | 22 min | 2 tasks | 6 files |
 | Phase 02 P02 | 6min | 2 tasks | 12 files |
+| Phase 02 P03 | 9min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,7 @@ Recent decisions affecting current work:
 - [Phase 02]: Systemic errors (LLM/Hunter auth or quota, SendError) abort the batch; rejected input lines are failed rows at their file position; 25-domain per-run cap
 - [Phase 02]: robots.txt answers are stored on disk only for 2xx and 4xx; 5xx and 429 are transient and retried next run
 - [Phase 02]: Page-cache entries carry GUARD_VERSION; any entry without the current version is re-fetched through every guard
+- [Phase 02]: 02-03: extract validation compares quotes to prompt_text (the text the model saw); instruction lines are removed by narrow full-phrase regexes and a quote from a removed line is dropped as instruction_like_text
 
 ### Pending Todos
 
@@ -109,6 +111,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T10:51:51.211Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-11-03T10:56:26.149Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None

@@ -66,7 +66,7 @@ Note: the skeleton's Hunter call goes through a minimal cache-first path so the 
   3. At the end of a run a summary table lists every domain with its outcome drawn from the full set (qualified, disqualified, insufficient data, no contact, rejected draft, sent, failed).
   4. For each domain the homepage plus about, careers, security or trust, pricing and customers pages are fetched with timeouts, size caps and robots.txt respected, and a page with too little text or a block signature is marked unavailable and never reaches the LLM.
   5. Extracted company data validates against the schema with unknown fields left null, every evidence item carries a quote and source URL that is a verbatim substring of the fetched text, and instruction-like text planted in a page does not change the output.
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -76,7 +76,7 @@ Plans:
 - [x] 02-02-PLAN.md — Safe multi-page scraping: robots.txt, private-address and redirect guards, hidden-text stripping, thin or blocked page gate, six page kinds within caps (SCR-01, SCR-02)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-03-PLAN.md — Evidence-quoted CompanyProfile with verbatim-quote validation, injection-proof prompting and no tools (EXT-01, EXT-02, EXT-03)
+- [x] 02-03-PLAN.md — Evidence-quoted CompanyProfile with verbatim-quote validation, injection-proof prompting and no tools (EXT-01, EXT-02, EXT-03)
 
 ### Phase 3: ICP Rubric and Bounded Agent Loop
 **Goal:** Every company gets a reproducible, defensible qualification verdict from a written ICP rubric, and insufficient data triggers a capped, logged agent loop instead of a guess.
@@ -136,7 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Walking Skeleton | 4/4 | Complete    | 2026-11-03 |
-| 2. Runner, CLI and Real Scrape/Extract | 2/3 | In Progress | - |
+| 2. Runner, CLI and Real Scrape/Extract | 3/3 | In Progress | - |
 | 3. ICP Rubric and Bounded Agent Loop | 0/TBD | Not started | - |
 | 4. PoC Selection | 0/TBD | Not started | - |
 | 5. Pain Points, Draft and Validator | 0/TBD | Not started | - |
