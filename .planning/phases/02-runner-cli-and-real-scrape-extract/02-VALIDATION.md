@@ -61,12 +61,14 @@ Every task also runs `.venv/bin/python -m pytest -q` (whole suite) as a second `
 | RUN-01 | 02-01 T1, T2 | `test_run_cli_domains_file_prints_summary_table`, `test_run_cli_has_no_interactive_prompt` |
 | RUN-02 | 02-01 T2, 02-02 T2 | `test_unreachable_domain_is_failed_and_batch_continues`, `test_stage_exception_is_failed_and_batch_continues`, `test_systemic_error_aborts_batch`, `test_dead_domain_is_failed_through_run_batch` |
 | RUN-03 | 02-01 T2 | `test_run_cli_defaults_to_dry_run_and_never_sends`, `test_run_cli_send_flag_calls_sender_once_per_completed_domain` |
-| RUN-04 | 02-01 T1, T2 | `test_render_summary_lists_every_domain_and_all_seven_counts`, `test_outcome_for_maps_all_seven_outcomes` |
-| SCR-01 | 02-02 T1, T2 | `test_robots_disallowed_path_is_unavailable_without_request`, `test_fetch_deadline_stops_slow_body`, `test_scrape_fetches_home_and_five_page_kinds` |
-| SCR-02 | 02-02 T1, T2 | `test_challenge_page_is_unavailable_blocked`, `test_thin_page_is_unavailable_too_short`, `test_blocked_page_never_reaches_llm_through_run_batch` |
+| RUN-04 | 02-01 T1, T2 | `test_render_summary_lists_every_domain_and_all_seven_counts`, `test_outcome_for_maps_all_seven_outcomes`, `test_rejected_lines_keep_file_order_in_summary` |
+| SCR-01 | 02-02 T1, T2 | `test_robots_disallowed_path_is_unavailable_without_request`, `test_fetch_deadline_stops_slow_body`, `test_legacy_unversioned_cache_entry_is_ignored`, `test_scrape_fetches_home_and_five_page_kinds` |
+| SCR-02 | 02-02 T1, T2 | `test_challenge_page_is_unavailable_blocked`, `test_thin_page_is_unavailable_too_short`, `test_thin_page_chars_is_extracted_length_and_text_none`, `test_blocked_page_never_reaches_llm_through_run_batch` |
 | EXT-01 | 02-03 T1 | `test_company_profile_schema_requires_every_field_and_has_no_defaults`, `test_unknown_facts_stay_null_through_run_one` |
 | EXT-02 | 02-03 T1, T2 | `test_quote_on_other_page_is_dropped`, `test_scalar_with_bad_quote_becomes_null`, `test_quote_from_removed_line_is_instruction_like_text` |
-| EXT-03 | 02-03 T2 | `test_page_closing_tag_breakout_is_escaped`, `test_extract_call_passes_no_tools`, `test_injected_page_yields_same_validated_profile_as_clean_page`, `test_planted_instructions_do_not_change_extracted_profile` |
+| EXT-03 | 02-03 T2 | `test_page_closing_tag_breakout_is_escaped`, `test_extract_call_passes_no_tools`, `test_ordinary_copy_is_not_flagged_as_instructions`, `test_planted_instruction_lines_are_flagged`, `test_injected_page_yields_same_validated_profile_as_clean_page`, `test_planted_instructions_do_not_change_extracted_profile` |
+
+Cross-plan guard: from Plan 02-02 on, every test-double fetcher in `tests/` must accept `fetch(url, site=None)`; checked by `test_test_fetchers_accept_site_keyword` (02-01) and the `def fetch(` grep gate in 02-02 Task 2 (baseline at HEAD: 1 stub lacks `site`).
 
 ---
 
