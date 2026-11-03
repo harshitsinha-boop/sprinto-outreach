@@ -1,10 +1,11 @@
-"""Phase 1 commands: `skeleton` (dry run through the real clients) and `smoke` (live proof).
+"""Commands: `run` (a file of domains), `skeleton` (one domain, dry run) and `smoke` (live proof).
 
-`skeleton` never calls Resend: Phase 1 has no flag that sends (RUN-03's --send is Phase 2).
-Only `smoke` sends, and only to OWNER_EMAIL, through `send_email`.
+`skeleton` never calls Resend. `run` is a dry run unless `--send` is passed; `smoke` sends
+only to OWNER_EMAIL. Every send goes through the guarded `send_email`.
 """
 
 import sys
+from pathlib import Path
 from typing import TextIO
 
 import typer
@@ -14,13 +15,14 @@ from outreach.config import ConfigError, Settings, configure_logging, load_setti
 from outreach.fetch import PageFetcher
 from outreach.hunter import FixtureHunter, HunterClient
 from outreach.llm import LLMClient
+from outreach.runner import load_domains, render_summary, run_batch, write_summary
 from outreach.skeleton import Context, run_one
 from outreach.smoke import SMOKE_CHECKS, run_smoke
 
 app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
-    help="Sprinto cold outreach pipeline (Phase 1: skeleton and smoke).",
+    help="Sprinto cold outreach pipeline: run (a file of domains), skeleton (one domain) and smoke.",
 )
 
 
@@ -57,6 +59,48 @@ def build_context(
 def _fail_config(e: ConfigError) -> "typer.Exit":
     typer.echo(str(e), err=True)  # names only, never values
     return typer.Exit(2)
+
+
+@app.command()
+def run(
+    domains_file: Path = typer.Argument(
+        ...,
+        exists=True,
+        dir_okay=False,
+        readable=True,
+        metavar="DOMAINS_FILE",
+        help="Text file with one company domain per line (# comments and blank lines are skipped).",
+    ),
+) -> None:
+    """Run every domain in a file through the pipeline and print one summary table.
+
+    A dry run: payloads are printed and Resend is never called.
+    """
+    configure_logging()
+    require = ("GEMINI_API_KEY", "OWNER_EMAIL")
+    try:
+        settings = load_settings(require=require)
+    except ConfigError as e:
+        raise _fail_config(e) from None
+
+    entries = load_domains(domains_file)
+    n_domains = sum(1 for e in entries if isinstance(e, str))
+    if n_domains == 0:
+        typer.echo(f"no domains in {domains_file}", err=True)
+        raise typer.Exit(2)
+
+    typer.echo(
+        f"MODE: dry-run (Resend will NOT be called) | recipient: {settings.owner_email} "
+        f"| hunter: fixture (no credits; contact only for {FixtureHunter().fixture_domain}) "
+        f"| domains: {n_domains}"
+    )
+    ctx = build_context(settings, hunter_fixture=True, dry_run=True)
+    summary = run_batch(entries, ctx, hunter_label="fixture", progress=sys.stdout)
+    path = write_summary(summary, settings.out_dir)
+    typer.echo(render_summary(summary))
+    typer.echo(f"batch=complete domains={len(summary.rows)} summary={path}")
+    sys.stdout.flush()
+    raise typer.Exit(0)
 
 
 @app.command()

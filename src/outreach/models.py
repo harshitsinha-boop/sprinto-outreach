@@ -104,3 +104,44 @@ class RunRecord(BaseModel):
     stages: list[StageRecord] = Field(default_factory=list)
     models: dict[str, str] = Field(default_factory=dict)
     counters: dict[str, int] = Field(default_factory=dict)
+
+
+# ---- batch runner contracts (Phase 2): the closed outcome vocabulary ----
+
+OUTCOMES = (
+    "qualified",
+    "disqualified",
+    "insufficient_data",
+    "no_contact",
+    "rejected_draft",
+    "sent",
+    "failed",
+)
+
+Outcome = Literal[
+    "qualified",
+    "disqualified",
+    "insufficient_data",
+    "no_contact",
+    "rejected_draft",
+    "sent",
+    "failed",
+]
+
+
+class BatchRow(BaseModel):
+    domain: str
+    outcome: Outcome
+    detail: str = ""
+    run_record: str | None = None
+
+
+class BatchSummary(BaseModel):
+    mode: Literal["dry_run", "send"]
+    hunter: str
+    started_at: str
+    finished_at: str | None = None
+    rows: list[BatchRow] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+    aborted: bool = False
+    abort_reason: str | None = None
