@@ -18,7 +18,7 @@ A time-boxed (1.5 hour) build of a Python CLI that takes a file of company domai
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation and Walking Skeleton** - One hardcoded domain runs end to end as a dry-run, with secrets hygiene and all four APIs proven live (completed 2026-11-03)
-- [ ] **Phase 2: Runner, CLI and Real Scrape/Extract** - One command runs a file of domains with failure isolation, safe multi-page scraping and evidence-quoted extraction
+- [x] **Phase 2: Runner, CLI and Real Scrape/Extract** - One command runs a file of domains with failure isolation, safe multi-page scraping and evidence-quoted extraction (completed 2026-11-03)
 - [ ] **Phase 3: ICP Rubric and Bounded Agent Loop** - Reproducible weighted qualification with a capped, logged agent loop for insufficient data
 - [ ] **Phase 4: PoC Selection** - One named decision-maker per qualified company from cached, budget-capped Hunter lookups
 - [ ] **Phase 5: Pain Points, Draft and Validator** - Two grounded pain points and a validated 50-90 word email addressed by name
@@ -66,7 +66,7 @@ Note: the skeleton's Hunter call goes through a minimal cache-first path so the 
   3. At the end of a run a summary table lists every domain with its outcome drawn from the full set (qualified, disqualified, insufficient data, no contact, rejected draft, sent, failed).
   4. For each domain the homepage plus about, careers, security or trust, pricing and customers pages are fetched with timeouts, size caps and robots.txt respected, and a page with too little text or a block signature is marked unavailable and never reaches the LLM.
   5. Extracted company data validates against the schema with unknown fields left null, every evidence item carries a quote and source URL that is a verbatim substring of the fetched text, and instruction-like text planted in a page does not change the output.
-**Plans:** 3/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
@@ -136,7 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Walking Skeleton | 4/4 | Complete    | 2026-11-03 |
-| 2. Runner, CLI and Real Scrape/Extract | 3/3 | In Progress | - |
+| 2. Runner, CLI and Real Scrape/Extract | 3/3 | Complete    | 2026-11-03 |
 | 3. ICP Rubric and Bounded Agent Loop | 0/TBD | Not started | - |
 | 4. PoC Selection | 0/TBD | Not started | - |
 | 5. Pain Points, Draft and Validator | 0/TBD | Not started | - |
