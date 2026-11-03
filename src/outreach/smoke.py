@@ -26,7 +26,9 @@ from outreach.llm import LLMAuthError, LLMClient, LLMError
 from outreach.send import send_email
 
 SMOKE_CHECKS = ("gemini_structured", "gemini_tools", "hunter", "resend")
-TOOL_RESULT_ROLE = "tool"
+# Live-proven (01-04, Assumption A1): the Gemini API rejected role="tool" with a 400 on the
+# function-response turn and accepted role="user"; Phase 4's agent loop must send "user" too.
+TOOL_RESULT_ROLE = "user"
 FALLBACK_TOOL_RESULT_ROLE = "user"
 # Free or near-free checks; they run first and the first FAIL here stops the run.
 CHEAP_CHECKS = ("gemini_structured", "gemini_tools", "hunter_account")

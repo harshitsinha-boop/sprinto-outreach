@@ -71,7 +71,7 @@ def test_structured_refuses_cached_client(tmp_path):
 def test_function_calling_passes_and_keeps_thought_signature():
     llm = make_llm([FC, text_response("Example Domain")])
     r = check_function_calling(llm, SMART)
-    assert r.ok and "role=tool" in r.detail
+    assert r.ok and "role=user" in r.detail
 
     calls = llm._c.models.calls
     assert len(calls) == 2
@@ -80,7 +80,7 @@ def test_function_calling_passes_and_keeps_thought_signature():
     contents = calls[1]["contents"]
     model_turn = next(c for c in contents if c.role == "model")
     assert model_turn.parts[0].thought_signature == b"sig"
-    assert contents[-1].role == "tool"
+    assert contents[-1].role == "user"  # live-proven (01-04, A1): the API rejects role="tool"
     assert contents[-1].parts[0].function_response.name == "fetch_page"
 
 
@@ -91,9 +91,11 @@ def test_function_calling_fails_without_call():
     assert len(llm._c.models.calls) == 1
 
 
-def test_function_calling_falls_back_to_user_role_on_400():
+def test_function_calling_falls_back_to_user_role_on_400(monkeypatch):
+    # The live default is now "user"; re-arm the "tool" default so the fallback path stays covered.
+    monkeypatch.setattr("outreach.smoke.TOOL_RESULT_ROLE", "tool")
     llm = make_llm([FC, api_error(400, "INVALID_ARGUMENT", "bad role"), text_response("ok")])
-    r = check_function_calling(llm, SMART)
+    r = check_function_calling(llm, SMART, role="tool")
     assert r.ok and "role=user" in r.detail
     calls = llm._c.models.calls
     assert len(calls) == 3
