@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sprinto-outreach"
+version = "0.1.0"
+description = "Sprinto cold outreach pipeline: qualify, find a decision-maker, draft and send a personalised email."
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=2.34,<3",
+    "pydantic>=2.14,<3",
+    "httpx>=0.28,<0.29",
+    "trafilatura>=2.3,<3",
+    "beautifulsoup4>=4.15,<5",
+    "lxml>=6.1,<7",
+    "resend>=2.50,<3",
+    "typer>=0.27,<1",
+    "python-dotenv>=1.2,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.2,<10",
+    "respx>=0.23,<0.24",
+]
+
+[project.scripts]
+outreach = "outreach.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

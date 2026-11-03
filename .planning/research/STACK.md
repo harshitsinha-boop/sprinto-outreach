@@ -20,7 +20,7 @@
 | beautifulsoup4 + lxml | 4.15.0 + 6.1.3 | Fallback text extraction, link discovery (about/careers/security/pricing/blog paths), `<title>`/meta | trafilatura is not a link discoverer (its docs say `include_links` only keeps links inside extracted content). Use BS4 for finding candidate sub-page URLs from the homepage nav and as the `get_text()` fallback when trafilatura returns `None`. HIGH |
 | resend | 2.50.1 | Send email | Official SDK. `resend.api_key = ...; resend.Emails.send({...}, {"idempotency_key": ...})`. Raises `resend.exceptions.ResendError` subclasses (`ValidationError`, `RateLimitError`, `InvalidApiKeyError`); missing required arg raises plain `ValueError`. HIGH |
 | typer | 0.27.3 | CLI (`run domains.txt --dry-run --limit N`) | Type-hint driven, ships rich output, `--dry-run` flag is one line. Faster to write than argparse for a multi-flag CLI; the 1.5h budget favours it. HIGH |
-| python-dotenv | 1.2.4 | Load `.env` (GEMINI_API_KEY, HUNTER_API_KEY, RESEND_API_KEY, RECIPIENT_EMAIL) | Minimal. `genai.Client()` reads `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) from the environment automatically once `load_dotenv()` ran. HIGH |
+| python-dotenv | 1.2.4 | Load `.env` (GEMINI_API_KEY, HUNTER_API_KEY, RESEND_API_KEY, OWNER_EMAIL) | Minimal. `genai.Client()` reads `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) from the environment automatically once `load_dotenv()` ran. HIGH |
 | pytest | 9.2.0 | Tests | Standard. HIGH |
 
 ### Database / Caching
@@ -120,7 +120,7 @@ for step in range(MAX_STEPS):                       # hard cap, e.g. 3
 ### Resend (official docs + 403 error page)
 
 - `pip install resend`; `resend.api_key = os.environ["RESEND_API_KEY"]`; `resend.Emails.send({"from": "Name <onboarding@resend.dev>", "to": [OWN_EMAIL], "subject": ..., "text": ..., "html": ..., "reply_to": ...}, {"idempotency_key": f"outreach/{domain}/{date}"})`. Returns dict with `id`. Params use snake_case (`reply_to`). Idempotency keys: <=256 chars, 24h expiry. Rate limit 10 req/s per team.
-- `onboarding@resend.dev` is a test-only sender. Sending to anyone other than the email on your Resend account returns HTTP 403 `validation_error`: "You can only send testing emails to your own email address". Resend docs also say not to use it in production. This matches the brief's hardcoded-recipient rule, so: read `RECIPIENT_EMAIL` from `.env`, assert at startup that it is a single address, and never take `to` from Hunter data. Catch the 403 and print a clear message ("recipient must equal your Resend signup email").
+- `onboarding@resend.dev` is a test-only sender. Sending to anyone other than the email on your Resend account returns HTTP 403 `validation_error`: "You can only send testing emails to your own email address". Resend docs also say not to use it in production. This matches the brief's hardcoded-recipient rule, so: read `OWNER_EMAIL` from `.env`, assert at startup that it is a single address, and never take `to` from Hunter data. Catch the 403 and print a clear message ("recipient must equal your Resend signup email").
 - Send plain `text` (plus optional minimal `html`): cold emails read better as plain text and it sidesteps HTML templating. Put the real prospect name/email in the body or a header line so the demo shows who it WOULD have gone to (e.g. subject prefix `[To: Jane Doe <jane@acme.com>]` in dry-run/demo mode).
 - Test recipients `delivered@resend.dev`, `bounced@resend.dev` exist, but test emails count against your quota.
 
@@ -152,7 +152,7 @@ pip install "pytest>=9.2,<10" "respx>=0.23,<0.24"
 GEMINI_API_KEY=
 HUNTER_API_KEY=
 RESEND_API_KEY=
-RECIPIENT_EMAIL=            # must equal the email on your Resend account
+OWNER_EMAIL=            # must equal the email on your Resend account
 GEMINI_MODEL_SMART=gemini-3.8-flash
 GEMINI_MODEL_FAST=gemini-3.5-flash-lite
 ```
@@ -185,7 +185,7 @@ GEMINI_MODEL_FAST=gemini-3.5-flash-lite
 | Trusting schema constraints (`maxLength`, `uniqueItems`) | Silently stripped by Gemini's constrained decoding. | Pydantic validation after parsing |
 | `requests` + BeautifulSoup only, no timeouts | Hangs on slow sites, kills the demo run. | httpx with explicit timeouts |
 | `RobotFileParser.read()` directly | No timeout, uses urllib default UA. | Fetch robots.txt with httpx and `parse()` |
-| Sending to Hunter-found addresses | Brief hardcodes `to:`; `onboarding@resend.dev` 403s for other recipients anyway, and cold-emailing real people is out of scope. | `RECIPIENT_EMAIL` from `.env` only |
+| Sending to Hunter-found addresses | Brief hardcodes `to:`; `onboarding@resend.dev` 403s for other recipients anyway, and cold-emailing real people is out of scope. | `OWNER_EMAIL` from `.env` only |
 | Hunter searches without a cache | 25-50 credits/month total. | File cache keyed by normalised domain, checked first |
 | Selenium, Scrapy | Heavy frameworks for ~6 pages/company. | httpx + trafilatura |
 | `langchain` / `crewai` / agent frameworks | Hide the loop, add dependency churn, and the brief wants a bounded, logged loop you can defend. | A 30-line manual loop |
