@@ -8,7 +8,7 @@ partial trail.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, TextIO
 
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ from outreach.audit import RunStore, now_iso
 from outreach.cache import normalize_domain
 from outreach.config import Settings, redact
 from outreach.models import PageResult, RunRecord, StageRecord
+from outreach.qualify import LoadedRubric, load_rubric
 from outreach.stages import StopStage
 
 
@@ -64,6 +65,7 @@ class Context:
     dry_run: bool = True
     sender: Callable | None = None
     out: TextIO | None = None
+    rubric: LoadedRubric = field(default_factory=load_rubric)
 
 
 def _refresh_counters(rec: RunRecord, ctx: Context) -> None:
@@ -82,7 +84,12 @@ def run_one(domain: str, ctx: Context) -> RunRecord:
         started_at=now_iso(),
         models={"fast": ctx.settings.gemini_model_fast, "smart": ctx.settings.gemini_model_smart},
     )
-    ctx.store.flush(rec)  # the trail exists before stage 1
+    rec.rubric = {
+        "version": ctx.rubric.rubric.version,
+        "sha256": ctx.rubric.sha256,
+        "file": ctx.rubric.path.name,
+    }
+    ctx.store.flush(rec)  # the trail exists before stage 1, naming the rubric it runs under
 
     prev: dict = {}
     for name, fn in stages_mod.STAGES:
@@ -94,6 +101,8 @@ def run_one(domain: str, ctx: Context) -> RunRecord:
         except StopStage as stop:
             sr.status = "stopped"
             sr.output = {"reason": stop.reason, "detail": redact(stop.detail, ctx.settings)}
+            if stop.output is not None:
+                sr.output["result"] = stop.output.model_dump(mode="json")
             sr.finished_at = now_iso()
             rec.stages.append(sr)
             rec.status = "stopped"

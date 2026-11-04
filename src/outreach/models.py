@@ -143,6 +143,61 @@ class ScoreBreakdown(BaseModel):
     gate_applied: bool = False
 
 
+class SignalScore(BaseModel):
+    """One rubric signal scored from validated evidence. `known` means points_min equals
+    points_max; `unknown` means 0 in the minimum and the full weight in the maximum."""
+
+    id: str
+    label: str
+    group: str
+    weight: int
+    status: Literal["known", "unknown"]
+    points_min: int
+    points_max: int
+    basis: str
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class GateResult(BaseModel):
+    id: str
+    label: str
+    status: Literal["pass", "fail", "unknown"]
+    basis: str
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class PenaltyHit(BaseModel):
+    id: str
+    label: str
+    points: int
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class RubricScore(BaseModel):
+    signals: list[SignalScore]
+    gates: list[GateResult]
+    penalties: list[PenaltyHit]
+    score_min: int
+    score_max: int
+    unknown_signals: list[str]
+
+
+class Qualification(BaseModel):
+    """The stored verdict: stage output of `qualify` (or `result` inside a stopped stage)."""
+
+    verdict: Literal["qualified", "disqualified", "insufficient_data"]
+    initial_verdict: Literal["qualified", "disqualified", "loop"]
+    reason: str
+    rubric_version: str
+    rubric_sha256: str
+    thresholds: dict[str, int]
+    initial_score: RubricScore
+    score: RubricScore
+    decided_with_unknowns: list[str] = Field(default_factory=list)
+    kinds_usable: list[str] = Field(default_factory=list)
+    profile: CompanyProfile
+
+
 class HunterContact(BaseModel):
     first_name: str
     last_name: str | None = None
@@ -187,6 +242,7 @@ class RunRecord(BaseModel):
     stages: list[StageRecord] = Field(default_factory=list)
     models: dict[str, str] = Field(default_factory=dict)
     counters: dict[str, int] = Field(default_factory=dict)
+    rubric: dict[str, str] = Field(default_factory=dict)
 
 
 # ---- batch runner contracts (Phase 2): the closed outcome vocabulary ----
@@ -228,3 +284,4 @@ class BatchSummary(BaseModel):
     counts: dict[str, int] = Field(default_factory=dict)
     aborted: bool = False
     abort_reason: str | None = None
+    rubric: dict[str, str] = Field(default_factory=dict)

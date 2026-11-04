@@ -1,0 +1,181 @@
+# Sprinto ICP rubric, version icp.1.
+#
+# This file is the whole qualification policy. Python reads it, hashes the exact bytes
+# (sha256 goes into every run.json) and applies it; nothing about weights or thresholds
+# lives in code. Editing any byte changes the hash, so every decision names the rubric
+# it was made under.
+#
+# Notes for reviewers:
+# - The weights are uncalibrated hypotheses adapted from .planning/research/FEATURES.md
+#   section 3. They are a starting point, not measured truth.
+# - The thresholds (qualify_min 60, reject_max 45) were fixed before any demo-domain
+#   score was seen. tests/test_qualify.py pins them, so changing them is a visible edit.
+# - FEATURES signals B4 (thin security page) and C3 (security-review artefacts) need fields
+#   the Phase 2 CompanyProfile does not extract, so their 13 points went to B1 to B3.
+# - The competitor-tool penalty is not in this rubric: incumbent detection is the v2
+#   requirement ICP-01.
+#
+# Scoring in short: every signal is known (points from validated evidence) or unknown
+# (0 points in score_min, full weight in score_max). A company is qualified when
+# score_min >= qualify_min, rejected when score_max < reject_max or a hard gate fails,
+# and otherwise goes to the bounded research step.
+
+version = "icp.1"
+description = "Sprinto ICP: B2B software companies about to need SOC 2 / ISO 27001 / GDPR evidence"
+
+[thresholds]
+qualify_min = 60
+reject_max = 45
+reference_year = 2026
+
+# ---- hard gates: a failed gate disqualifies regardless of score; null is unknown, not fail ----
+
+[[gates]]
+id = "G1_b2b"
+label = "Sells to businesses (not a consumer product)"
+field = "is_b2b"
+fail_values = [false]
+
+[[gates]]
+id = "G3_size_ceiling"
+label = "Under 1001 employees"
+field = "headcount"
+fail_values = ["1001+"]
+
+# ---- weighted signals (weights sum to 100) ----
+
+[[signals]]
+id = "b2b_software"
+label = "B2B product"
+group = "A"
+weight = 10
+kind = "map"
+field = "is_b2b"
+target_kinds = ["home", "pricing", "about"]
+[signals.points]
+true = 10
+false = 0
+
+[[signals]]
+id = "funding_stage"
+label = "Funding stage"
+group = "A"
+weight = 10
+kind = "map"
+field = "stage"
+target_kinds = ["about"]
+[signals.points]
+series_a = 10
+series_b = 10
+series_c = 10
+seed = 7
+bootstrapped = 5
+pre_seed = 3
+series_d_or_later = 2
+public = 2
+
+[[signals]]
+id = "headcount_band"
+label = "Headcount band"
+group = "A"
+weight = 10
+kind = "map"
+field = "headcount"
+target_kinds = ["about", "careers"]
+[signals.points]
+"51-200" = 10
+"11-50" = 8
+"201-500" = 5
+"501-1000" = 3
+"1-10" = 2
+"1001+" = 0
+
+[[signals]]
+id = "compliance_pursuit"
+label = "Pursuing a compliance framework"
+group = "B"
+weight = 25
+kind = "best"
+field = "compliance_mentions"
+attribute = "status"
+observed_on = ["security"]
+target_kinds = ["security"]
+[signals.points]
+in_progress = 25
+planned = 25
+mentioned = 10
+certified = 6
+
+[[signals]]
+id = "enterprise_customers"
+label = "Named enterprise customers"
+group = "B"
+weight = 15
+kind = "count"
+field = "enterprise_customers"
+tiers = [[3, 15], [2, 10], [1, 5]]
+observed_on = ["customers"]
+target_kinds = ["customers"]
+
+[[signals]]
+id = "security_hiring"
+label = "Hiring for security, compliance or infrastructure"
+group = "B"
+weight = 15
+kind = "keyword"
+field = "hiring_signals"
+attribute = "role"
+observed_on = ["careers"]
+target_kinds = ["careers"]
+
+[[signals.keyword_groups]]
+points = 15
+keywords = ["security", "compliance", "grc", "risk", "privacy", "trust", "governance", "ciso", "infosec"]
+
+[[signals.keyword_groups]]
+points = 5
+keywords = ["devops", "sre", "site reliability", "infrastructure", "platform", "it"]
+
+[[signals]]
+id = "recent_funding"
+label = "Funding stage dated this year or last"
+group = "C"
+weight = 10
+kind = "year_recency"
+field = "stage"
+target_kinds = ["about"]
+[signals.points]
+age_le_1 = 10
+age_2 = 5
+older = 0
+
+[[signals]]
+id = "regulated_vertical"
+label = "Regulated or compliance-heavy vertical"
+group = "C"
+weight = 5
+kind = "text_keyword"
+field = "offering"
+keywords = [
+  "fintech", "finance", "financial", "payment", "payments", "payroll", "accounts payable",
+  "banking", "lending", "insurance", "health", "healthcare", "medical", "clinical",
+  "hr", "human resources", "legal", "government",
+]
+target_kinds = ["home", "about"]
+[signals.points]
+match = 5
+
+# ---- penalties: certified frameworks already held lower the need, so lower both bounds ----
+
+[[penalties]]
+id = "P1_mature_soc2_type2_and_iso27001"
+label = "Already certified SOC 2 Type II and ISO 27001"
+points = 30
+requires = ["soc2typeii", "iso27001"]
+
+[[penalties]]
+id = "P2_soc2_type2_only"
+label = "Already certified SOC 2 Type II"
+points = 15
+requires = ["soc2typeii"]
+excludes = ["iso27001"]

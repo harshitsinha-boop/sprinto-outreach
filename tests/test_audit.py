@@ -17,7 +17,7 @@ from outreach.skeleton import run_one
 
 DOMAIN = CANARY_ENV["SKELETON_DOMAIN"]
 REPO_ROOT = Path(__file__).resolve().parent.parent
-STAGE_ORDER = ["scrape", "extract", "score", "hunter", "draft", "send"]
+STAGE_ORDER = ["scrape", "extract", "qualify", "hunter", "draft", "send"]
 
 
 class SnapshotStore(RunStore):
@@ -53,7 +53,7 @@ def test_per_stage_failure_keeps_prior_stages(ctx):
     assert [(s["name"], s["status"]) for s in data["stages"]] == [
         ("scrape", "ok"),
         ("extract", "ok"),
-        ("score", "ok"),
+        ("qualify", "ok"),
         ("hunter", "ok"),
         ("draft", "failed"),
     ]
@@ -108,7 +108,7 @@ def test_hard_kill_leaves_partial_trail(tmp_path):
     assert proc.returncode == 17, proc.stderr
     data = json.loads((out_dir / DOMAIN / "run.json").read_text())
     assert data["status"] == "running"
-    assert [s["name"] for s in data["stages"]] == ["scrape", "extract", "score", "hunter"]
+    assert [s["name"] for s in data["stages"]] == ["scrape", "extract", "qualify", "hunter"]
 
 
 def test_atomic_write_leaves_no_tmp(ctx, tmp_path):

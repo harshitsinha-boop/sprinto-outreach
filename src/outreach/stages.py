@@ -22,12 +22,12 @@ from outreach.models import (
     ExtractOutput,
     HunterContact,
     PageResult,
-    ScoreBreakdown,
-    ScoreItem,
+    Qualification,
     ScrapeOutput,
     SendResult,
 )
-from outreach.pagegate import MIN_PAGE_CHARS, is_usable, page_gate
+from outreach.pagegate import is_usable, page_gate
+from outreach.qualify import qualify
 from outreach.scrape import scrape_domain
 from outreach.send import send_email
 
@@ -38,10 +38,11 @@ if TYPE_CHECKING:  # avoid an import cycle with skeleton.py
 class StopStage(Exception):
     """An expected, logged stop (not a failure): the run ends with status `stopped`."""
 
-    def __init__(self, reason: str, detail: str = ""):
+    def __init__(self, reason: str, detail: str = "", output: BaseModel | None = None):
         super().__init__(f"{reason}: {detail}" if detail else reason)
         self.reason = reason
         self.detail = detail
+        self.output = output  # a typed record stored with the stopped stage (e.g. Qualification)
 
 
 class DomainUnreachable(Exception):
@@ -49,13 +50,6 @@ class DomainUnreachable(Exception):
     failure, never a StopStage: the batch records the domain as `failed` and carries on."""
 
 
-SIMPLE_SCORE_WEIGHTS = {
-    "is_b2b": 40,
-    "compliance_mentions": 25,
-    "enterprise_customers": 20,
-    "hiring_signals": 15,
-}
-SIMPLE_SCORE_THRESHOLD = 60
 DRAFT_PROMPT_VERSION = "draft.1"
 
 DRAFT_SYSTEM = (
@@ -91,28 +85,6 @@ def build_draft_prompt(profile: CompanyProfile, contact: HunterContact) -> str:
         f"{_evidence_block(profile)}\n"
         "</evidence>\n\n"
         "Write the email. Return a subject and a body."
-    )
-
-
-def _present(value: object) -> bool | None:
-    if value is None:
-        return None
-    if isinstance(value, (list, tuple)):
-        return len(value) > 0
-    return bool(getattr(value, "value", value))
-
-
-def simple_score(profile: CompanyProfile) -> ScoreBreakdown:
-    """Pure four-signal score. The ICP gate arrives in Phase 3, so gate_applied is False."""
-    items: list[ScoreItem] = []
-    total = 0
-    for signal, weight in SIMPLE_SCORE_WEIGHTS.items():
-        present = _present(getattr(profile, signal))
-        points = weight if present else 0
-        total += points
-        items.append(ScoreItem(signal=signal, weight=weight, present=present, points=points))
-    return ScoreBreakdown(
-        items=items, total=total, threshold=SIMPLE_SCORE_THRESHOLD, gate_applied=False
     )
 
 
@@ -152,8 +124,13 @@ def stage_extract(ctx: Context, domain: str, prev: dict) -> ExtractOutput:
     return extract_profile(ctx.llm, ctx.settings.gemini_model_fast, usable_pages(prev["scrape"].pages))
 
 
-def stage_score(ctx: Context, domain: str, prev: dict) -> ScoreBreakdown:
-    return simple_score(prev["extract"].profile)
+def stage_qualify(ctx: Context, domain: str, prev: dict) -> Qualification:
+    """Score the validated profile with the hashed rubric. Anything but `qualified` stops the
+    run here, so Hunter is never called for a rejected or undecided company."""
+    q = qualify(prev["extract"].profile, prev["scrape"].pages, ctx.rubric)
+    if q.verdict != "qualified":
+        raise StopStage(q.verdict, q.reason[:200], output=q)
+    return q
 
 
 def stage_hunter(ctx: Context, domain: str, prev: dict) -> HunterContact:
@@ -195,7 +172,7 @@ def stage_send(ctx: Context, domain: str, prev: dict) -> SendResult:
 STAGES = [
     ("scrape", stage_scrape),
     ("extract", stage_extract),
-    ("score", stage_score),
+    ("qualify", stage_qualify),
     ("hunter", stage_hunter),
     ("draft", stage_draft),
     ("send", stage_send),

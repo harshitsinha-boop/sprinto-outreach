@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -151,6 +152,20 @@ def obedient_extract_response() -> CompanyProfile:
     return profile
 
 
+def _retarget_home_url(response, prompt: str):
+    """The canned extract response cites example.com. When the run is for another domain, the
+    validator would drop every item (its source page was never given), so point the response at
+    the first page that really is in the prompt. Keeps one canned response usable per domain."""
+    if f'<page url="{HOME_URL}"' in prompt or HOME_URL not in response.model_dump_json():
+        return response
+    match = re.search(r'<page url="([^"]+)"', prompt)
+    if match is None:
+        return response
+    return type(response).model_validate_json(
+        response.model_dump_json().replace(HOME_URL, match.group(1))
+    )
+
+
 class FakeLLM:
     """Stands in for LLMClient. Keyed by `purpose`; records every call."""
 
@@ -189,7 +204,10 @@ class FakeLLM:
             self.on_call(purpose, call)
         if purpose in self.raise_on:
             raise self.raise_on[purpose]
-        return self.responses[purpose].model_copy(deep=True)
+        response = self.responses[purpose].model_copy(deep=True)
+        if purpose == "extract":
+            response = _retarget_home_url(response, prompt)
+        return response
 
 
 class FakeHunter:
