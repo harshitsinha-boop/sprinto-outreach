@@ -17,9 +17,15 @@ from outreach import stages as stages_mod
 from outreach.audit import RunStore, now_iso
 from outreach.cache import normalize_domain
 from outreach.config import Settings, redact
-from outreach.models import PageResult, RunRecord, StageRecord
+from outreach.models import PageResult, RunRecord, StageRecord, ToolReply, ToolResult, ToolSpec
 from outreach.qualify import LoadedRubric, load_rubric
 from outreach.stages import StopStage
+
+
+class ToolSessionLike(Protocol):
+    def send(self, prompt: str) -> ToolReply: ...
+
+    def respond(self, results: list[ToolResult]) -> ToolReply: ...
 
 
 class LLMLike(Protocol):
@@ -37,6 +43,18 @@ class LLMLike(Protocol):
         prompt_version: str = "1",
         max_output_tokens: int = 4096,
     ) -> BaseModel: ...
+
+    def start_tool_session(
+        self,
+        *,
+        model: str,
+        system: str,
+        tool: ToolSpec,
+        purpose: str,
+        thinking_level: str | None = None,
+        prompt_version: str = "1",
+        max_output_tokens: int = 1024,
+    ) -> ToolSessionLike: ...
 
 
 class HunterLike(Protocol):

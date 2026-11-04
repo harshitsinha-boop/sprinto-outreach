@@ -8,12 +8,14 @@ cache key and break "second run makes no new Gemini calls".
 
 from __future__ import annotations
 
+import functools
 import hashlib
 from collections import Counter
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from outreach.agent import run_research
 from outreach.extract import extract_profile
 from outreach.models import (
     CompanyProfile,
@@ -23,6 +25,8 @@ from outreach.models import (
     HunterContact,
     PageResult,
     Qualification,
+    ResearchOutcome,
+    RubricScore,
     ScrapeOutput,
     SendResult,
 )
@@ -124,10 +128,37 @@ def stage_extract(ctx: Context, domain: str, prev: dict) -> ExtractOutput:
     return extract_profile(ctx.llm, ctx.settings.gemini_model_fast, usable_pages(prev["scrape"].pages))
 
 
+def _research(
+    ctx: Context,
+    domain: str,
+    profile: CompanyProfile,
+    pages: list[PageResult],
+    score: RubricScore,
+) -> ResearchOutcome:
+    """The bounded research loop, bound to this run's LLM, fetcher, domain and models."""
+    return run_research(
+        ctx.llm,
+        ctx.fetcher,
+        domain=domain,
+        smart_model=ctx.settings.gemini_model_smart,
+        fast_model=ctx.settings.gemini_model_fast,
+        profile=profile,
+        pages=pages,
+        loaded=ctx.rubric,
+        score=score,
+    )
+
+
 def stage_qualify(ctx: Context, domain: str, prev: dict) -> Qualification:
-    """Score the validated profile with the hashed rubric. Anything but `qualified` stops the
-    run here, so Hunter is never called for a rejected or undecided company."""
-    q = qualify(prev["extract"].profile, prev["scrape"].pages, ctx.rubric)
+    """Score the validated profile with the hashed rubric; a gray-band company gets the bounded
+    research loop first. Anything but `qualified` stops the run here, so Hunter is never called
+    for a rejected or undecided company."""
+    q = qualify(
+        prev["extract"].profile,
+        prev["scrape"].pages,
+        ctx.rubric,
+        research=functools.partial(_research, ctx, domain),
+    )
     if q.verdict != "qualified":
         raise StopStage(q.verdict, q.reason[:200], output=q)
     return q
@@ -145,7 +176,7 @@ def stage_draft(ctx: Context, domain: str, prev: dict) -> DraftOutput:
     draft = ctx.llm.generate_structured(
         model=ctx.settings.gemini_model_smart,
         system=DRAFT_SYSTEM,
-        prompt=build_draft_prompt(prev["extract"].profile, contact),
+        prompt=build_draft_prompt(prev["qualify"].profile, contact),
         schema=EmailDraft,
         purpose="draft",
         thinking_level="LOW",

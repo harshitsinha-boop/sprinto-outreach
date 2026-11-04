@@ -240,14 +240,16 @@ def validate_profile(
     return profile.model_copy(update=update), drops, checked
 
 
-def extract_profile(llm: LLMLike, model: str, pages: list[PageResult]) -> ExtractOutput:
+def extract_profile(
+    llm: LLMLike, model: str, pages: list[PageResult], *, purpose: str = "extract"
+) -> ExtractOutput:
     """One structured call, no tools, then deterministic evidence validation."""
     raw = llm.generate_structured(
         model=model,
         system=EXTRACT_SYSTEM,
         prompt=build_extract_prompt(pages),
         schema=CompanyProfile,
-        purpose="extract",
+        purpose=purpose,
         prompt_version=EXTRACT_PROMPT_VERSION,
     )
     profile, drops, checked = validate_profile(raw, pages)

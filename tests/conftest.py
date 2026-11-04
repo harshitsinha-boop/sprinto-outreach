@@ -29,6 +29,7 @@ from outreach.models import (
     HiringSignal,
     PageResult,
     StageFact,
+    ToolReply,
 )
 from outreach.skeleton import Context
 
@@ -166,15 +167,61 @@ def _retarget_home_url(response, prompt: str):
     )
 
 
-class FakeLLM:
-    """Stands in for LLMClient. Keyed by `purpose`; records every call."""
+class FakeToolSession:
+    """Stands in for llm.ToolSession: each send or respond pops one item of the owner's
+    `tool_script` (a ToolReply to return, or an Exception to raise). An empty script answers
+    with no call at all."""
 
-    def __init__(self, responses=None, *, raise_on=None, on_call=None):
+    def __init__(self, owner: FakeLLM, *, model, system, tool, purpose):
+        self.owner = owner
+        self.meta = {"model": model, "system": system, "tool": tool, "purpose": purpose}
+
+    def _turn(self, kind: str, **detail) -> ToolReply:
+        owner = self.owner
+        turn = {"kind": kind, **self.meta, **detail}
+        owner.tool_turns.append(turn)
+        owner.stats.api_calls += 1
+        if owner.on_call is not None:
+            owner.on_call(self.meta["purpose"], turn)
+        item = owner.tool_script.pop(0) if owner.tool_script else ToolReply()
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    def send(self, prompt: str) -> ToolReply:
+        return self._turn("send", prompt=prompt)
+
+    def respond(self, results) -> ToolReply:
+        return self._turn("respond", results=results)
+
+
+class FakeLLM:
+    """Stands in for LLMClient. Keyed by `purpose`; records every call. A `responses[purpose]`
+    value may be a list, served in order with the last item repeated. `tool_script` drives the
+    tool sessions (see FakeToolSession) and `tool_turns` records them."""
+
+    def __init__(self, responses=None, *, raise_on=None, on_call=None, tool_script=None):
         self.responses = responses if responses is not None else default_llm_responses()
         self.raise_on = raise_on or {}
         self.on_call = on_call
+        self.tool_script = list(tool_script or [])
         self.calls: list[dict] = []
+        self.tool_turns: list[dict] = []
+        self._served: dict[str, int] = {}
         self.stats = SimpleNamespace(api_calls=0, cache_hits=0)
+
+    def start_tool_session(
+        self,
+        *,
+        model,
+        system,
+        tool,
+        purpose,
+        thinking_level=None,
+        prompt_version="1",
+        max_output_tokens=1024,
+    ):
+        return FakeToolSession(self, model=model, system=system, tool=tool, purpose=purpose)
 
     def generate_structured(
         self,
@@ -204,7 +251,12 @@ class FakeLLM:
             self.on_call(purpose, call)
         if purpose in self.raise_on:
             raise self.raise_on[purpose]
-        response = self.responses[purpose].model_copy(deep=True)
+        value = self.responses[purpose]
+        if isinstance(value, list):
+            index = self._served.get(purpose, 0)
+            self._served[purpose] = index + 1
+            value = value[min(index, len(value) - 1)]
+        response = value.model_copy(deep=True)
         if purpose == "extract":
             response = _retarget_home_url(response, prompt)
         return response

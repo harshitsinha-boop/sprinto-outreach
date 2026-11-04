@@ -31,6 +31,7 @@ from google.genai import errors, types
 from pydantic import BaseModel
 
 from outreach.cache import atomic_write_json
+from outreach.models import ToolCall, ToolReply, ToolResult, ToolSpec
 
 # Documented live fallbacks. Plan 01-04 flips one only if the live smoke rejects the default.
 USE_RESPONSE_JSON_SCHEMA = True  # False: pass the Pydantic class as `response_schema`
@@ -100,6 +101,13 @@ class LLMStats:
     total_tokens: int = 0
 
 
+def _http_options() -> types.HttpOptions:
+    return types.HttpOptions(
+        timeout=REQUEST_TIMEOUT_MS,
+        retry_options=types.HttpRetryOptions(attempts=1),
+    )
+
+
 def build_config(
     *,
     system: str | None,
@@ -112,10 +120,7 @@ def build_config(
         "system_instruction": system,
         "response_mime_type": "application/json",
         "max_output_tokens": max_output_tokens,
-        "http_options": types.HttpOptions(
-            timeout=REQUEST_TIMEOUT_MS,
-            retry_options=types.HttpRetryOptions(attempts=1),
-        ),
+        "http_options": _http_options(),
     }
     if USE_RESPONSE_JSON_SCHEMA:
         kwargs["response_json_schema"] = gemini_schema(schema)
@@ -124,6 +129,108 @@ def build_config(
     if thinking_level and SEND_THINKING_CONFIG:
         kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=thinking_level)
     return types.GenerateContentConfig(**kwargs)
+
+
+def build_tool_config(
+    *,
+    system: str | None,
+    tool: ToolSpec,
+    max_output_tokens: int,
+    thinking_level: str | None,
+) -> types.GenerateContentConfig:
+    """Manual function-calling request config: one declared function, automatic function calling
+    disabled, the model forced to call it. Never carries a response schema (tools and a schema
+    are never mixed in one request) and never sets temperature, top_p or top_k."""
+    declaration = types.FunctionDeclaration(
+        name=tool.name,
+        description=tool.description,
+        parameters_json_schema=tool.parameters,
+    )
+    kwargs: dict[str, Any] = {
+        "system_instruction": system,
+        "tools": [types.Tool(function_declarations=[declaration])],
+        "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True),
+        "tool_config": types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(
+                mode="ANY", allowed_function_names=[tool.name]
+            )
+        ),
+        "max_output_tokens": max_output_tokens,
+        "http_options": _http_options(),
+    }
+    if thinking_level and SEND_THINKING_CONFIG:
+        kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=thinking_level)
+    return types.GenerateContentConfig(**kwargs)
+
+
+def _reply_text(content: types.Content) -> str | None:
+    parts = [p.text for p in (content.parts or []) if p.text and not p.thought]
+    return "".join(parts) or None
+
+
+class ToolSession:
+    """One manual function-calling conversation. Holds the history as SDK Content objects and
+    appends each model turn verbatim, which preserves thought signatures. Tool turns are never
+    mixed with structured calls: a session only ever sends `build_tool_config` requests."""
+
+    def __init__(
+        self,
+        client: LLMClient,
+        *,
+        model: str,
+        system: str,
+        tool: ToolSpec,
+        purpose: str,
+        thinking_level: str | None,
+        prompt_version: str,
+        max_output_tokens: int,
+    ):
+        self._client = client
+        self.model = model
+        self.system = system
+        self.tool = tool
+        self.purpose = purpose
+        self.thinking_level = thinking_level
+        self.prompt_version = prompt_version
+        self.max_output_tokens = max_output_tokens
+        self.contents: list[types.Content] = []
+
+    def send(self, prompt: str) -> ToolReply:
+        self.contents.append(types.Content(role="user", parts=[types.Part.from_text(text=prompt)]))
+        return self._turn()
+
+    def respond(self, results: list[ToolResult]) -> ToolReply:
+        # Call-time import: smoke.py imports this module at its top, so a module-level import
+        # here would be circular. Reading the attribute (not a copy) keeps one source of truth.
+        from outreach import smoke
+
+        self.contents.append(
+            types.Content(
+                role=smoke.TOOL_RESULT_ROLE,
+                parts=[
+                    types.Part.from_function_response(name=r.name, response=r.response)
+                    for r in results
+                ],
+            )
+        )
+        return self._turn()
+
+    def _turn(self) -> ToolReply:
+        cfg = build_tool_config(
+            system=self.system,
+            tool=self.tool,
+            max_output_tokens=self.max_output_tokens,
+            thinking_level=self.thinking_level,
+        )
+        r = self._client.generate_raw(self.model, self.contents, cfg)
+        if getattr(r, "automatic_function_calling_history", None):
+            raise LLMError("automatic function calling ran")
+        candidate = r.candidates[0] if r.candidates else None
+        if candidate is None or candidate.content is None:
+            return ToolReply()  # blocked or empty: nothing to append, nothing to cache
+        self.contents.append(candidate.content)
+        calls = [ToolCall(name=c.name or "", args=dict(c.args or {})) for c in r.function_calls or []]
+        return ToolReply(calls=calls, text=_reply_text(candidate.content))
 
 
 class LLMClient:
@@ -192,6 +299,30 @@ class LLMClient:
             self.stats.retries += 1
             self.sleep(delay)
         raise LLMError("unreachable")  # pragma: no cover - loop always returns or raises
+
+    # ----------------------------------------------------------------- tools
+
+    def start_tool_session(
+        self,
+        *,
+        model: str,
+        system: str,
+        tool: ToolSpec,
+        purpose: str,
+        thinking_level: str | None = None,
+        prompt_version: str = "1",
+        max_output_tokens: int = 1024,
+    ) -> ToolSession:
+        return ToolSession(
+            self,
+            model=model,
+            system=system,
+            tool=tool,
+            purpose=purpose,
+            thinking_level=thinking_level,
+            prompt_version=prompt_version,
+            max_output_tokens=max_output_tokens,
+        )
 
     # ----------------------------------------------------------- structured
 

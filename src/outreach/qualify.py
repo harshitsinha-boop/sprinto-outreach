@@ -17,18 +17,21 @@ import hashlib
 import re
 import tomllib
 from functools import lru_cache
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from outreach.models import (
+    AgentRun,
     CompanyProfile,
     Evidence,
     GateResult,
     PageResult,
     PenaltyHit,
     Qualification,
+    ResearchOutcome,
     RubricScore,
     RunRecord,
     SignalScore,
@@ -426,15 +429,39 @@ def final_verdict(score: RubricScore, rubric: Rubric) -> tuple[str, str]:
     )
 
 
+ResearchFn = Callable[[CompanyProfile, list[PageResult], RubricScore], ResearchOutcome]
+
+
 def qualify(
-    profile: CompanyProfile, pages: list[PageResult], loaded: LoadedRubric
+    profile: CompanyProfile,
+    pages: list[PageResult],
+    loaded: LoadedRubric,
+    *,
+    research: ResearchFn | None = None,
 ) -> Qualification:
-    """Score the validated profile against the rubric and record the verdict."""
+    """Score the validated profile against the rubric and record the verdict.
+
+    A gray-band company (initial verdict `loop`) goes to the `research` callable when one is
+    given; its outcome is re-scored here and the verdict always comes from `final_verdict` on the
+    final score. Every Qualification carries a research record naming why the loop did or did
+    not run."""
     rubric = loaded.rubric
-    kinds = usable_kinds(pages)
-    score = score_profile(profile, kinds, rubric)
-    initial = initial_verdict(score, rubric)
+    initial_score = score_profile(profile, usable_kinds(pages), rubric)
+    initial = initial_verdict(initial_score, rubric)
+    final_profile, final_pages, score = profile, pages, initial_score
+    ran = False
+    if initial != "loop":
+        agent = AgentRun(stop_reason="not_needed")
+    elif research is None:
+        agent = AgentRun(stop_reason="disabled")
+    else:
+        outcome = research(profile, pages, initial_score)
+        final_profile, final_pages, agent, ran = outcome.profile, outcome.pages, outcome.agent, True
+        score = score_profile(final_profile, usable_kinds(final_pages), rubric)
+    kinds = usable_kinds(final_pages)
     verdict, reason = final_verdict(score, rubric)
+    if ran:
+        reason += f"; research stop_reason={agent.stop_reason}, {agent.fetches} fetches"
     t = rubric.thresholds
     return Qualification(
         verdict=verdict,  # type: ignore[arg-type]
@@ -447,11 +474,12 @@ def qualify(
             "reject_max": t.reject_max,
             "reference_year": t.reference_year,
         },
-        initial_score=score,
+        initial_score=initial_score,
         score=score,
         decided_with_unknowns=[] if verdict == "qualified" else list(score.unknown_signals),
         kinds_usable=sorted(kinds),
-        profile=profile,
+        profile=final_profile,
+        research=agent,
     )
 
 

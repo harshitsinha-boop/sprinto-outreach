@@ -182,6 +182,87 @@ class RubricScore(BaseModel):
     unknown_signals: list[str]
 
 
+class ToolSpec(BaseModel):
+    """One function the agent loop may call. `parameters` is a JSON Schema object."""
+
+    name: str
+    description: str
+    parameters: dict
+
+
+class ToolCall(BaseModel):
+    name: str
+    args: dict = Field(default_factory=dict)
+
+
+class ToolResult(BaseModel):
+    """Code-generated answer to one ToolCall. Never carries page text."""
+
+    name: str
+    response: dict
+
+
+class ToolReply(BaseModel):
+    calls: list[ToolCall] = Field(default_factory=list)
+    text: str | None = None
+    from_cache: bool = False
+
+
+class Candidate(BaseModel):
+    """A same-domain URL the loop may fetch, with the unknown signals it could resolve."""
+
+    url: str
+    kind: str
+    signals: list[str] = Field(default_factory=list)
+
+
+StopReason = Literal[
+    "not_needed",
+    "disabled",
+    "sufficient_data",
+    "max_iters",
+    "no_missing_fields",
+    "no_candidates",
+    "no_progress",
+    "tool_errors",
+    "model_done",
+]
+
+
+class AgentStep(BaseModel):
+    """One logged model turn: what it asked for, why, what happened and the new interval."""
+
+    iteration: int
+    tool: str
+    url: str | None = None
+    reason: str | None = None
+    outcome: Literal["fetched", "unavailable", "error", "refused"]
+    refusal: str | None = None
+    page_kind: str | None = None
+    page_status: str | None = None
+    resolved_signals: list[str] = Field(default_factory=list)
+    score_min: int
+    score_max: int
+
+
+class AgentRun(BaseModel):
+    """The research record every Qualification carries, whether or not the loop ran."""
+
+    stop_reason: StopReason
+    iterations: int = 0
+    fetches: int = 0
+    llm_turns: int = 0
+    steps: list[AgentStep] = Field(default_factory=list)
+    candidates: list[Candidate] = Field(default_factory=list)
+    error: str | None = None
+
+
+class ResearchOutcome(BaseModel):
+    profile: CompanyProfile
+    pages: list[PageResult]
+    agent: AgentRun
+
+
 class Qualification(BaseModel):
     """The stored verdict: stage output of `qualify` (or `result` inside a stopped stage)."""
 
@@ -196,6 +277,7 @@ class Qualification(BaseModel):
     decided_with_unknowns: list[str] = Field(default_factory=list)
     kinds_usable: list[str] = Field(default_factory=list)
     profile: CompanyProfile
+    research: AgentRun | None = None
 
 
 class HunterContact(BaseModel):
