@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +13,25 @@ def atomic_write_json(path: Path | str, obj: Any) -> None:
     """Write JSON so a kill mid-write never leaves a half-written file at `path`."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_suffix(target.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, indent=2, default=str))
-    os.replace(tmp, target)
+    payload = json.dumps(obj, indent=2, default=str)
+    # A unique temp name per write, so concurrent writers never collide on one `.tmp` file.
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=target.name + ".", suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(payload)
+        try:
+            os.replace(tmp, target)
+        except OSError:
+            # Some serverless filesystems refuse the rename (EBUSY); a direct write still works.
+            target.write_text(payload)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
 
 
 def read_json(path: Path | str, default: Any = None) -> Any:
