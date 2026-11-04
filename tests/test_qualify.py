@@ -86,7 +86,7 @@ def test_default_company_qualifies_through_run_one_with_rubric_hash(ctx):
         "scrape",
         "extract",
         "qualify",
-        "hunter",
+        "poc",
         "draft",
         "send",
     ]

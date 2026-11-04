@@ -165,7 +165,7 @@ def stage_qualify(ctx: Context, domain: str, prev: dict) -> Qualification:
     return q
 
 
-def stage_hunter(ctx: Context, domain: str, prev: dict) -> HunterContact:
+def stage_poc(ctx: Context, domain: str, prev: dict) -> HunterContact:
     contact = pick_contact(ctx.hunter.domain_search(domain))
     if contact is None:
         raise StopStage("no_contact", "Hunter returned no person with a name and position")
@@ -173,7 +173,7 @@ def stage_hunter(ctx: Context, domain: str, prev: dict) -> HunterContact:
 
 
 def stage_draft(ctx: Context, domain: str, prev: dict) -> DraftOutput:
-    contact: HunterContact = prev["hunter"]
+    contact: HunterContact = prev["poc"]
     draft = ctx.llm.generate_structured(
         model=ctx.settings.gemini_model_smart,
         system=DRAFT_SYSTEM,
@@ -194,7 +194,7 @@ def stage_send(ctx: Context, domain: str, prev: dict) -> SendResult:
         draft.subject,
         draft.body,
         dry_run=ctx.dry_run,
-        intended=prev["hunter"],
+        intended=prev["poc"],
         idempotency_key=f"outreach-{domain}-{digest}",
         sender=ctx.sender,
         out=ctx.out,
@@ -205,7 +205,20 @@ STAGES = [
     ("scrape", stage_scrape),
     ("extract", stage_extract),
     ("qualify", stage_qualify),
-    ("hunter", stage_hunter),
+    ("poc", stage_poc),
     ("draft", stage_draft),
     ("send", stage_send),
 ]
+
+
+STAGE_FUNCS = dict(STAGES)
+
+# Typed output of every stage: lets a stateless caller (webapi) rebuild `prev` from plain JSON.
+STAGE_MODELS: dict[str, type[BaseModel]] = {
+    "scrape": ScrapeOutput,
+    "extract": ExtractOutput,
+    "qualify": Qualification,
+    "poc": HunterContact,
+    "draft": DraftOutput,
+    "send": SendResult,
+}

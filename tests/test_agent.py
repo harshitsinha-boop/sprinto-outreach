@@ -136,7 +136,7 @@ def test_gray_band_company_researches_one_page_and_qualifies(ctx):
     rec = run_one("example.com", ctx)
 
     assert rec.status == "dry_run"
-    assert [s.name for s in rec.stages] == ["scrape", "extract", "qualify", "hunter", "draft", "send"]
+    assert [s.name for s in rec.stages] == ["scrape", "extract", "qualify", "poc", "draft", "send"]
     q = stage_output(rec, "qualify")
     assert q["initial_verdict"] == "loop"
     assert (q["initial_score"]["score_min"], q["initial_score"]["score_max"]) == (30, 95)

@@ -35,7 +35,7 @@ from outreach.llm import LLMClient
 from outreach.skeleton import Context, run_one
 
 DOMAIN = CANARY_ENV["SKELETON_DOMAIN"]
-STAGE_ORDER = ["scrape", "extract", "qualify", "hunter", "draft", "send"]
+STAGE_ORDER = ["scrape", "extract", "qualify", "poc", "draft", "send"]
 
 
 def test_one_domain_runs_six_stages_to_dry_run(ctx, capsys):
@@ -92,7 +92,7 @@ def test_no_named_contact_stops_before_draft(ctx, fake_llm):
 
     assert rec.status == "stopped"
     assert rec.stop_reason == "no_contact"
-    assert [s.name for s in rec.stages] == ["scrape", "extract", "qualify", "hunter"]
+    assert [s.name for s in rec.stages] == ["scrape", "extract", "qualify", "poc"]
     assert [c["purpose"] for c in fake_llm.calls] == ["extract"]
 
 
