@@ -114,7 +114,7 @@ def test_hard_kill_leaves_partial_trail(tmp_path):
 def test_atomic_write_leaves_no_tmp(ctx, tmp_path):
     run_one(DOMAIN, ctx)
     run_dir = ctx.store.path_for(DOMAIN).parent
-    assert [p.name for p in run_dir.iterdir()] == ["run.json"]
+    assert sorted(p.name for p in run_dir.iterdir()) == ["decision.md", "run.json"]
 
     target = tmp_path / "nested" / "dir" / "obj.json"
     atomic_write_json(target, {"a": 1})

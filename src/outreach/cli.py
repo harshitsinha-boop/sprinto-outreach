@@ -15,6 +15,7 @@ from outreach.config import ConfigError, Settings, configure_logging, load_setti
 from outreach.fetch import PageFetcher
 from outreach.hunter import FixtureHunter, HunterClient
 from outreach.llm import LLMClient
+from outreach.replay import build_replay_context
 from outreach.runner import (
     BatchInputError,
     load_domains,
@@ -89,6 +90,12 @@ def run(
         help="Use the cache-first, budget-capped live Hunter client. "
         "The default is the offline fixture, which spends no credit.",
     ),
+    replay: bool = typer.Option(
+        False,
+        "--replay",
+        help="Re-run from the on-disk caches only: no network, no send. An uncached call is a "
+        "failed domain.",
+    ),
 ) -> None:
     """Run every domain in a file through the pipeline and print one summary table.
 
@@ -96,7 +103,10 @@ def run(
     Exit codes: 0 batch complete, 2 input or config error, 3 aborted by a systemic failure.
     """
     configure_logging()
-    require = (
+    if replay and send:
+        typer.echo("--replay never sends; drop --send", err=True)
+        raise typer.Exit(2)
+    require = ("OWNER_EMAIL",) if replay else (
         ("GEMINI_API_KEY", "OWNER_EMAIL")
         + (("HUNTER_API_KEY",) if live_hunter else ())
         + (("RESEND_API_KEY",) if send else ())
@@ -130,7 +140,11 @@ def run(
         banner += f" | invalid: {n_invalid}"
     typer.echo(banner)
 
-    ctx = build_context(settings, hunter_fixture=not live_hunter, dry_run=not send)
+    if replay:
+        typer.echo("MODE: replay (caches only, no network, no send)")
+        ctx = build_replay_context(settings, live_hunter=live_hunter)
+    else:
+        ctx = build_context(settings, hunter_fixture=not live_hunter, dry_run=not send)
     summary = run_batch(
         entries, ctx, hunter_label="live" if live_hunter else "fixture", progress=sys.stdout
     )
@@ -140,6 +154,21 @@ def run(
     typer.echo(f"batch={status} domains={len(summary.rows)} summary={path}")
     sys.stdout.flush()
     raise typer.Exit(3 if summary.aborted else 0)
+
+
+@app.command()
+def show(
+    domain: str = typer.Argument(..., help="Company domain whose decision log to print."),
+    out_dir: Path = typer.Option(Path("out"), "--out-dir", help="Run output directory."),
+) -> None:
+    """Print the readable decision log for one domain, rendered from its run.json (no network)."""
+    from outreach.decision import render_decision
+
+    rec = RunStore(out_dir).load(domain)
+    if rec is None:
+        typer.echo(f"no run record for {domain} under {out_dir}", err=True)
+        raise typer.Exit(1)
+    typer.echo(render_decision(rec))
 
 
 @app.command()

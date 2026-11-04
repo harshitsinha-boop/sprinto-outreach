@@ -25,7 +25,19 @@ class RunStore:
     def flush(self, rec: RunRecord) -> Path:
         path = self.path_for(rec.domain)
         atomic_write_json(path, rec.model_dump(mode="json"))
+        if rec.status != "running":
+            self._write_decision(rec, path.parent)
         return path
+
+    @staticmethod
+    def _write_decision(rec: RunRecord, folder: Path) -> None:
+        """decision.md beside run.json once the run is finished. Best effort: never fails a run."""
+        try:
+            from outreach.decision import render_decision
+
+            (folder / "decision.md").write_text(render_decision(rec), encoding="utf-8")
+        except Exception:  # noqa: BLE001 - the log is a convenience, run.json is the record
+            pass
 
     def load(self, domain: str) -> RunRecord | None:
         data = read_json(self.path_for(domain))
