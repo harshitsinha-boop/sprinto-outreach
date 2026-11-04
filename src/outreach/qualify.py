@@ -520,7 +520,31 @@ def render_breakdown(q: Qualification) -> str:
     for hit in q.score.penalties:
         lines.append(f"{_INDENT}penalty {hit.id} -{hit.points}")
         lines.extend(_evidence_lines(hit.evidence))
+    lines.extend(_research_lines(q))
     return "\n".join(lines)
+
+
+def _research_lines(q: Qualification) -> list[str]:
+    """The research record: one summary line, then one line per logged step. A company that never
+    needed research prints nothing."""
+    run = q.research
+    if run is None or run.stop_reason == "not_needed":
+        return []
+    lines = [
+        f"{_INDENT}research stop_reason={run.stop_reason} iterations={run.iterations} "
+        f"fetches={run.fetches}"
+    ]
+    for index, step in enumerate(run.steps, start=1):
+        result = f"refused ({step.refusal})" if step.outcome == "refused" else step.outcome
+        resolved = ", ".join(step.resolved_signals) or "nothing"
+        lines.append(
+            f'{_INDENT}{_INDENT}step {index} {_printable(step.url or "-")} '
+            f'"{_printable(step.reason or "")}" -> {result}; resolved: {resolved} '
+            f"(interval {step.score_min}..{step.score_max})"
+        )
+    if run.error:
+        lines.append(f"{_INDENT}{_INDENT}error: {_printable(run.error)}")
+    return lines
 
 
 def qualification_from_record(rec: RunRecord) -> Qualification | None:

@@ -22,7 +22,9 @@ import hashlib
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
+from outreach.config import Settings, redact
 from outreach.extract import canonical_url, extract_profile, normalize_ws
+from outreach.llm import LLMAuthError, LLMError, LLMQuotaError
 from outreach.models import (
     AgentRun,
     AgentStep,
@@ -32,6 +34,7 @@ from outreach.models import (
     ResearchOutcome,
     RubricScore,
     ToolCall,
+    ToolReply,
     ToolResult,
     ToolSpec,
 )
@@ -179,6 +182,7 @@ def _refusal(
     domain: str,
     offered: dict[str, Candidate],
     fetched: set[str],
+    fetches: int,
 ) -> tuple[str | None, Candidate | None]:
     """Why a call must not be fetched (a code), and the candidate it names when it may."""
     if call.name != FETCH_TOOL.name:
@@ -201,7 +205,43 @@ def _refusal(
         return "not_a_candidate", None
     if key in fetched:
         return "already_fetched", None
+    if fetches >= MAX_LOOP_FETCHES:  # unreachable with one fetch per turn; kept as a guard
+        return "fetch_cap", None
     return None, candidate
+
+
+def _str_arg(call: ToolCall, name: str) -> str | None:
+    value = call.args.get(name)
+    return value if isinstance(value, str) else None
+
+
+def _payload(
+    status: str,
+    url: str | None,
+    kind: str | None,
+    refusal: str | None,
+    resolved: list[str],
+    score: RubricScore,
+) -> dict:
+    """What the model is told about a call. Code-generated only: never page or link text."""
+    return {
+        "status": status,
+        "url": url[:200] if url else None,
+        "kind": kind,
+        "refusal": refusal,
+        "resolved_signals": resolved,
+        "unknown_signals": list(score.unknown_signals),
+        "score_min": score.score_min,
+        "score_max": score.score_max,
+    }
+
+
+def _error_text(exc: Exception, settings: Settings | None) -> str:
+    """A recorded LLM error: type and message with secrets masked, or just the type name when
+    there are no settings to redact with."""
+    if settings is None:
+        return type(exc).__name__
+    return redact(f"{type(exc).__name__}: {exc}", settings)[:200]
 
 
 def run_research(
@@ -215,7 +255,11 @@ def run_research(
     pages: list[PageResult],
     loaded: LoadedRubric,
     score: RubricScore,
+    settings: Settings | None = None,
 ) -> ResearchOutcome:
+    """At most MAX_LOOP_ITERATIONS model turns, each fetching at most one offered same-domain
+    page. Always ends on a named stop reason. Auth and quota errors propagate (they are systemic
+    and abort the batch); any other LLM error ends the loop with `tool_errors`."""
     rubric = loaded.rubric
     pages = list(pages)
     candidates = research_candidates(domain, pages, score, rubric)
@@ -231,9 +275,9 @@ def run_research(
     offered = {canonical(c.url): c for c in candidates}
     fetched: set[str] = set()
     steps: list[AgentStep] = []
-    fetches = 0
-    llm_turns = 0
-    iterations = 0
+    fetches = llm_turns = iterations = 0
+    no_progress_streak = error_streak = 0
+    error: str | None = None
     stop = "model_done"
 
     session = llm.start_tool_session(
@@ -244,31 +288,47 @@ def run_research(
         thinking_level="LOW",
         prompt_version=AGENT_PROMPT_VERSION,
     )
-    reply = session.send(build_agent_prompt(domain, score, rubric, candidates))
-    llm_turns += 1
+
+    def turn(action) -> ToolReply | None:
+        """One model turn. None when a non-systemic LLM error ended the loop."""
+        nonlocal llm_turns, error
+        llm_turns += 1
+        try:
+            return action()
+        except (LLMAuthError, LLMQuotaError):
+            raise
+        except LLMError as exc:
+            error = _error_text(exc, settings)
+            return None
+
+    reply = turn(lambda: session.send(build_agent_prompt(domain, score, rubric, candidates)))
+    if reply is None:
+        stop = "tool_errors"
 
     for iteration in range(1, MAX_LOOP_ITERATIONS + 1):
+        if reply is None:
+            break
         if not reply.calls:
             stop = "model_done"
             break
         iterations = iteration
-        call = reply.calls[0]
-        refusal, candidate = _refusal(call, domain, offered, fetched)
-        url = call.args.get("url") if isinstance(call.args.get("url"), str) else None
-        reason = call.args.get("reason") if isinstance(call.args.get("reason"), str) else None
+        call, extras = reply.calls[0], reply.calls[1:]
+        refusal, candidate = _refusal(call, domain, offered, fetched, fetches)
+        url, reason = _str_arg(call, "url"), _str_arg(call, "reason")
         before = score
+        page_kind = page_status = None
+        extract_failed = False
         if refusal is not None or candidate is None:
-            outcome, page_kind, page_status = "refused", None, None
+            outcome = "refused"
         else:
-            key = canonical(candidate.url)
-            fetched.add(key)
+            fetched.add(canonical(candidate.url))
             fetches += 1
             page = fetcher.fetch(candidate.url, site=domain).model_copy(
                 update={"kind": candidate.kind}
             )
             held = {_text_hash(p.text or "") for p in pages if is_usable(p)}
             if is_usable(page) and _text_hash(page.text or "") in held:
-                page = page.model_copy(
+                page = page.model_copy(  # a soft 404 or SPA shell repeating a page already held
                     update={
                         "status": "unavailable",
                         "reason": "duplicate_content",
@@ -284,8 +344,14 @@ def run_research(
                 outcome = "error"
             elif is_usable(page):
                 outcome = "fetched"
-                extracted = extract_profile(llm, fast_model, [page], purpose="research_extract")
-                profile = merge_profiles(profile, extracted.profile)
+                try:
+                    extracted = extract_profile(llm, fast_model, [page], purpose="research_extract")
+                except (LLMAuthError, LLMQuotaError):
+                    raise
+                except LLMError as exc:
+                    error, extract_failed, outcome = _error_text(exc, settings), True, "error"
+                else:
+                    profile = merge_profiles(profile, extracted.profile)
             else:
                 outcome = "unavailable"
         score = score_profile(profile, usable_kinds(pages), rubric)
@@ -305,24 +371,53 @@ def run_research(
                 score_max=score.score_max,
             )
         )
-        if initial_verdict(score, rubric) != "loop":
+        results = [
+            ToolResult(
+                name=call.name, response=_payload(outcome, url, page_kind, refusal, resolved, score)
+            )
+        ]
+        for extra in extras:  # one fetch per turn: answer every extra call, fetch none of them
+            extra_url = _str_arg(extra, "url")
+            steps.append(
+                AgentStep(
+                    iteration=iteration,
+                    tool=extra.name,
+                    url=extra_url,
+                    reason=_str_arg(extra, "reason"),
+                    outcome="refused",
+                    refusal="one_fetch_per_turn",
+                    score_min=score.score_min,
+                    score_max=score.score_max,
+                )
+            )
+            results.append(
+                ToolResult(
+                    name=extra.name,
+                    response=_payload("refused", extra_url, None, "one_fetch_per_turn", [], score),
+                )
+            )
+        no_progress_streak = 0 if resolved else no_progress_streak + 1
+        error_streak = error_streak + 1 if outcome == "error" else 0
+        if extract_failed:
+            stop = "tool_errors"
+        elif initial_verdict(score, rubric) != "loop":
             stop = "sufficient_data"
-            break
-        if iteration == MAX_LOOP_ITERATIONS:
+        elif error_streak >= TOOL_ERROR_LIMIT:
+            stop = "tool_errors"
+        elif no_progress_streak >= NO_PROGRESS_LIMIT:
+            stop = "no_progress"
+        elif not score.unknown_signals:
+            stop = "no_missing_fields"
+        elif iteration == MAX_LOOP_ITERATIONS:
             stop = "max_iters"
-            break
-        payload = {
-            "status": outcome,
-            "url": url,
-            "kind": page_kind,
-            "refusal": refusal,
-            "resolved_signals": resolved,
-            "unknown_signals": list(score.unknown_signals),
-            "score_min": score.score_min,
-            "score_max": score.score_max,
-        }
-        reply = session.respond([ToolResult(name=call.name, response=payload)])
-        llm_turns += 1
+        elif all(canonical(c.url) in fetched for c in candidates):
+            stop = "no_candidates"
+        else:
+            reply = turn(lambda: session.respond(results))
+            if reply is None:
+                stop = "tool_errors"
+            continue
+        break
 
     return ResearchOutcome(
         profile=profile,
@@ -334,5 +429,6 @@ def run_research(
             llm_turns=llm_turns,
             steps=steps,
             candidates=candidates,
+            error=error,
         ),
     )

@@ -146,6 +146,7 @@ def _research(
         pages=pages,
         loaded=ctx.rubric,
         score=score,
+        settings=ctx.settings,
     )
 
 
