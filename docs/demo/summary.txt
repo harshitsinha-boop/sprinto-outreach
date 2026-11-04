@@ -1,0 +1,10 @@
+SUMMARY mode=dry_run hunter=fixture
+rubric icp.1 sha256=f4f5d4b507d8
+domain                 outcome            detail
+acme-ledger.example    qualified          dry-run: email drafted, Resend not called
+northwind-pay.example  qualified          dry-run: email drafted, Resend not called
+pocket-pals.example    disqualified       gate G1_b2b failed: is_b2b=false
+ghost-site.example     insufficient_data  0 usable of 13 pages (too_short=13)
+unreachable.example    failed             scrape: DomainUnreachable: all 1 fetches failed: DNS resolution failed
+nocontact-co.example   no_contact         Hunter returned no suitable named person for this company
+outcomes: qualified=2 disqualified=1 insufficient_data=1 no_contact=1 rejected_draft=0 sent=0 failed=1

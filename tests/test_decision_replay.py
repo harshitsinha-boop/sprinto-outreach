@@ -134,3 +134,20 @@ def test_replay_refuses_send(settings, tmp_path, monkeypatch):
     domains.write_text("example.com\n")
     monkeypatch.setattr(cli_mod, "load_settings", lambda **kw: settings)
     assert CliRunner().invoke(app, ["run", str(domains), "--replay", "--send"]).exit_code == 2
+
+
+def test_demo_script_runs_offline_and_covers_every_outcome(tmp_path, monkeypatch, capsys):
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "demo.py"
+    spec = importlib.util.spec_from_file_location("demo_script", path)
+    demo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(demo)
+    monkeypatch.setattr(demo, "OUT", tmp_path / "demo")
+    monkeypatch.setattr(httpx.Client, "send", lambda *a, **k: (_ for _ in ()).throw(AssertionError("network")))
+    assert demo.main() == 0
+    out = capsys.readouterr().out
+    for outcome in ("qualified", "disqualified", "insufficient_data", "no_contact", "failed"):
+        assert outcome in out
+    assert (tmp_path / "demo" / "summary.txt").exists()
