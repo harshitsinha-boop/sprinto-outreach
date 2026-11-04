@@ -314,12 +314,27 @@ def test_ui_javascript_parses():
         assert r.returncode == 0, r.stderr
 
 
+def test_web_copy_reads_icp2_values_from_the_rubric_not_hardcoded_text():
+    js = (ROOT / "web" / "app.js").read_text()
+    html = (ROOT / "web" / "index.html").read_text()
+    assert "score_expected" in js and "qualify_expected" in js and "unknown_credit" in js
+    assert 'data-q="qualify_expected"' in html and 'data-q="unknown_credit"' in html
+    assert "expected score" in html and "estimate" in html
+    assert "60 and 45" not in html and "60 and 45" not in js
+
+
 def test_rubric_endpoint_public_shape_and_no_secrets():
     app = make_app()
     status, out = app.handle("GET", "/api/rubric", {}, b"", "1.1.1.1")  # no password needed
     assert status == 200
     assert out["version"] and len(out["sha256"]) == 64
     assert (out["qualify_min"], out["reject_max"]) == (60, 45)
+    assert out["version"] == "icp.2"
+    assert (out["unknown_credit"], out["qualify_expected"]) == (0.5, 55)
+    assert {s["id"]: s["weight"] for s in out["signals"]} == {
+        "b2b_software": 10, "funding_stage": 5, "headcount_band": 5, "compliance_pursuit": 30,
+        "enterprise_customers": 20, "security_hiring": 20, "regulated_vertical": 10,
+    }
     assert out["gates"] and out["penalties"]
     assert sum(s["weight"] for s in out["signals"]) == 100
     first = out["signals"][0]

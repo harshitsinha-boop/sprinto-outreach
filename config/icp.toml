@@ -1,32 +1,48 @@
-# Sprinto ICP rubric, version icp.1.
+# Sprinto ICP rubric, version icp.2.
 #
 # This file is the whole qualification policy. Python reads it, hashes the exact bytes
 # (sha256 goes into every run.json) and applies it; nothing about weights or thresholds
 # lives in code. Editing any byte changes the hash, so every decision names the rubric
 # it was made under.
 #
+# HONESTY NOTE: icp.2 is a recalibration made AFTER seeing real scores from icp.1. Six live
+# runs (clerk.com, stytch.com, airbyte.com ended insufficient_data; posthog.com, supabase.com,
+# hightouch.com were disqualified) showed that 30 of 100 points rested on facts company websites
+# rarely state (funding stage, headcount, funding recency), so score_min could never reach 60
+# and unknowns were treated as 0 even after research. Changes: weights moved toward observable
+# signals, recent_funding removed, and an unknown_credit rule added (see docs/calibration.md).
+# These icp.2 weights and thresholds are now FIXED. They must not be tuned again against the
+# six domains above; a separate holdout set, not used for tuning, will be run afterwards.
+#
 # Notes for reviewers:
-# - The weights are uncalibrated hypotheses adapted from .planning/research/FEATURES.md
-#   section 3. They are a starting point, not measured truth.
-# - The thresholds (qualify_min 60, reject_max 45) were fixed before any demo-domain
-#   score was seen. tests/test_qualify.py pins them, so changing them is a visible edit.
+# - The weights are hypotheses adapted from .planning/research/FEATURES.md section 3, then
+#   re-weighted once toward observable signals as described above.
+# - tests/test_qualify.py pins the version, weight sum and thresholds, so changing any of them
+#   is a visible edit.
 # - FEATURES signals B4 (thin security page) and C3 (security-review artefacts) need fields
-#   the Phase 2 CompanyProfile does not extract, so their 13 points went to B1 to B3.
+#   the CompanyProfile does not extract.
 # - The competitor-tool penalty is not in this rubric: incumbent detection is the v2
 #   requirement ICP-01.
+# - Penalties P1/P2 are unchanged on purpose: a company already certified SOC 2 Type II needs
+#   Sprinto less, so scoring it lower is correct.
 #
 # Scoring in short: every signal is known (points from validated evidence) or unknown
-# (0 points in score_min, full weight in score_max). A company is qualified when
-# score_min >= qualify_min, rejected when score_max < reject_max or a hard gate fails,
-# and otherwise goes to the bounded research step.
+# (0 points in score_min, full weight in score_max). score_expected = score_min +
+# unknown_credit x (score_max - score_min), i.e. an unresolved unknown counts for half its
+# weight. A company is disqualified when a gate fails or score_max < reject_max. It is
+# qualified when score_min >= qualify_min, OR when the research loop has run, at least 2
+# signals are known from validated evidence and score_expected >= qualify_expected (an
+# estimate, reported as "qualified on expected score"). Otherwise it is insufficient_data.
 
-version = "icp.1"
+version = "icp.2"
 description = "Sprinto ICP: B2B software companies about to need SOC 2 / ISO 27001 / GDPR evidence"
 
 [thresholds]
 qualify_min = 60
 reject_max = 45
 reference_year = 2026
+unknown_credit = 0.5
+qualify_expected = 55
 
 # ---- hard gates: a failed gate disqualifies regardless of score; null is unknown, not fail ----
 
@@ -60,60 +76,60 @@ false = 0
 id = "funding_stage"
 label = "Funding stage"
 group = "A"
-weight = 10
+weight = 5
 kind = "map"
 field = "stage"
 target_kinds = ["about"]
 [signals.points]
-series_a = 10
-series_b = 10
-series_c = 10
-seed = 7
-bootstrapped = 5
-pre_seed = 3
-series_d_or_later = 2
-public = 2
+series_a = 5
+series_b = 5
+series_c = 5
+seed = 4
+bootstrapped = 3
+pre_seed = 2
+series_d_or_later = 1
+public = 1
 
 [[signals]]
 id = "headcount_band"
 label = "Headcount band"
 group = "A"
-weight = 10
+weight = 5
 kind = "map"
 field = "headcount"
 target_kinds = ["about", "careers"]
 [signals.points]
-"51-200" = 10
-"11-50" = 8
-"201-500" = 5
-"501-1000" = 3
-"1-10" = 2
+"51-200" = 5
+"11-50" = 4
+"201-500" = 3
+"501-1000" = 2
+"1-10" = 1
 "1001+" = 0
 
 [[signals]]
 id = "compliance_pursuit"
 label = "Pursuing a compliance framework"
 group = "B"
-weight = 25
+weight = 30
 kind = "best"
 field = "compliance_mentions"
 attribute = "status"
 observed_on = ["security"]
 target_kinds = ["security"]
 [signals.points]
-in_progress = 25
-planned = 25
-mentioned = 10
-certified = 6
+in_progress = 30
+planned = 30
+mentioned = 12
+certified = 7
 
 [[signals]]
 id = "enterprise_customers"
 label = "Named enterprise customers"
 group = "B"
-weight = 15
+weight = 20
 kind = "count"
 field = "enterprise_customers"
-tiers = [[3, 15], [2, 10], [1, 5]]
+tiers = [[3, 20], [2, 13], [1, 7]]
 observed_on = ["customers"]
 target_kinds = ["customers"]
 
@@ -121,7 +137,7 @@ target_kinds = ["customers"]
 id = "security_hiring"
 label = "Hiring for security, compliance or infrastructure"
 group = "B"
-weight = 15
+weight = 20
 kind = "keyword"
 field = "hiring_signals"
 attribute = "role"
@@ -129,31 +145,18 @@ observed_on = ["careers"]
 target_kinds = ["careers"]
 
 [[signals.keyword_groups]]
-points = 15
+points = 20
 keywords = ["security", "compliance", "grc", "risk", "privacy", "trust", "governance", "ciso", "infosec"]
 
 [[signals.keyword_groups]]
-points = 5
+points = 7
 keywords = ["devops", "sre", "site reliability", "infrastructure", "platform", "it"]
-
-[[signals]]
-id = "recent_funding"
-label = "Funding stage dated this year or last"
-group = "C"
-weight = 10
-kind = "year_recency"
-field = "stage"
-target_kinds = ["about"]
-[signals.points]
-age_le_1 = 10
-age_2 = 5
-older = 0
 
 [[signals]]
 id = "regulated_vertical"
 label = "Regulated or compliance-heavy vertical"
 group = "C"
-weight = 5
+weight = 10
 kind = "text_keyword"
 field = "offering"
 keywords = [
@@ -163,7 +166,7 @@ keywords = [
 ]
 target_kinds = ["home", "about"]
 [signals.points]
-match = 5
+match = 10
 
 # ---- penalties: certified frameworks already held lower the need, so lower both bounds ----
 

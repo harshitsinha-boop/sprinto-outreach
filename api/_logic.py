@@ -76,6 +76,8 @@ def load_rubric(path: Path = RUBRIC_PATH) -> dict:
         "sha256": hashlib.sha256(raw).hexdigest(),
         "qualify_min": th.get("qualify_min"),
         "reject_max": th.get("reject_max"),
+        "unknown_credit": th.get("unknown_credit", 0),
+        "qualify_expected": th.get("qualify_expected"),
         "gates": [
             {"id": g["id"], "label": g.get("label", g["id"]), "field": g.get("field", ""),
              "fail_values": g.get("fail_values", [])}

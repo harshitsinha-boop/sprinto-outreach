@@ -38,7 +38,7 @@ def _company_section(rec: RunRecord) -> list[str]:
         lines.append(why or (f"Run failed at `{failed.name}`: {failed.error}" if failed else "Not reached."))
         return lines + [""]
     lines.append(f"**Verdict: {q.verdict}** - {q.reason}")
-    lines.append(f"Score {q.score.score_min} to {q.score.score_max} against threshold "
+    lines.append(f"Score {q.score.score_min} to {q.score.score_max} (expected {q.score.score_expected}) against threshold "
                  f"{q.thresholds}; rubric {q.rubric_version} (sha256 {q.rubric_sha256[:12]}).")
     if q.decided_with_unknowns:
         lines.append(f"Decided with unknown signals: {', '.join(q.decided_with_unknowns)}.")

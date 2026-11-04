@@ -54,6 +54,8 @@ class Thresholds(_Strict):
     qualify_min: int
     reject_max: int
     reference_year: int
+    unknown_credit: float = 0.0  # share of an unresolved unknown's weight that counts toward score_expected
+    qualify_expected: int = 100  # score_expected needed to qualify after research (100 = rule off)
 
 
 class GateRule(_Strict):
@@ -155,6 +157,16 @@ def _validate(rubric: Rubric) -> None:
         raise RubricError(
             f"qualify_min {rubric.thresholds.qualify_min} must be above "
             f"reject_max {rubric.thresholds.reject_max}"
+        )
+    t = rubric.thresholds
+    if not 0.0 <= t.unknown_credit <= 1.0:
+        raise RubricError(f"unknown_credit {t.unknown_credit} must be between 0 and 1")
+    if t.qualify_expected > 100 or t.qualify_expected < 0 or (
+        t.unknown_credit > 0 and not t.reject_max < t.qualify_expected < t.qualify_min
+    ):
+        raise RubricError(
+            f"qualify_expected {t.qualify_expected} must sit between reject_max {t.reject_max} "
+            f"and qualify_min {t.qualify_min}"
         )
     for gate in rubric.gates:
         if gate.field not in profile_fields:
@@ -365,12 +377,16 @@ def score_profile(
     score_min = max(0, sum(s.points_min for s in signals) - cut)
     score_max = max(0, sum(s.points_max for s in signals) - cut)
     unknown = sorted((s for s in signals if s.status == "unknown"), key=lambda s: (-s.weight, s.id))
+    expected = round(
+        score_min + rubric.thresholds.unknown_credit * (score_max - score_min), 1
+    )
     return RubricScore(
         signals=signals,
         gates=gates,
         penalties=penalties,
         score_min=score_min,
         score_max=score_max,
+        score_expected=expected,
         unknown_signals=[s.id for s in unknown],
     )
 
@@ -408,7 +424,28 @@ def initial_verdict(
     return "loop"
 
 
-def final_verdict(score: RubricScore, rubric: Rubric) -> tuple[str, str]:
+def _known_with_evidence(score: RubricScore) -> int:
+    return sum(1 for s in score.signals if s.status == "known" and s.evidence)
+
+
+def expected_qualifies(score: RubricScore, rubric: Rubric, researched: bool) -> bool:
+    """The estimate-based route to `qualified`: only after the research loop has run, with at
+    least 2 signals known from validated evidence, and with something still unknown (a fully
+    known score below qualify_min is a plain miss, not an estimate)."""
+    t = rubric.thresholds
+    return (
+        researched
+        and t.unknown_credit > 0
+        and bool(score.unknown_signals)
+        and _known_with_evidence(score) >= 2
+        and score.score_expected is not None
+        and score.score_expected >= t.qualify_expected
+    )
+
+
+def final_verdict(
+    score: RubricScore, rubric: Rubric, researched: bool = False
+) -> tuple[str, str]:
     t = rubric.thresholds
     failed = _failed_gate(score)
     if failed is not None:
@@ -417,6 +454,15 @@ def final_verdict(score: RubricScore, rubric: Rubric) -> tuple[str, str]:
         return "qualified", f"score_min {score.score_min} >= qualify_min {t.qualify_min}"
     if score.score_max < t.reject_max:
         return "disqualified", f"score_max {score.score_max} < reject_max {t.reject_max}"
+    if expected_qualifies(score, rubric, researched):
+        return (
+            "qualified",
+            f"qualified on expected score {score.score_expected} "
+            f"(min {score.score_min}..max {score.score_max}): an estimate crediting "
+            f"{len(score.unknown_signals)} unresolved signals at {t.unknown_credit:g} of their weight "
+            f"({', '.join(score.unknown_signals)}); {_known_with_evidence(score)} signals known from "
+            f"evidence; qualify_expected {t.qualify_expected}",
+        )
     if not score.unknown_signals:
         return (
             "disqualified",
@@ -424,8 +470,9 @@ def final_verdict(score: RubricScore, rubric: Rubric) -> tuple[str, str]:
         )
     return (
         "insufficient_data",
-        f"score {score.score_min}..{score.score_max} straddles reject_max {t.reject_max} "
-        f"and qualify_min {t.qualify_min}; unknown: {', '.join(score.unknown_signals)}",
+        f"score {score.score_min}..{score.score_max} (expected {score.score_expected}) straddles "
+        f"reject_max {t.reject_max} and qualify_min {t.qualify_min}; unknown: "
+        f"{', '.join(score.unknown_signals)}",
     )
 
 
@@ -459,7 +506,10 @@ def qualify(
         final_profile, final_pages, agent, ran = outcome.profile, outcome.pages, outcome.agent, True
         score = score_profile(final_profile, usable_kinds(final_pages), rubric)
     kinds = usable_kinds(final_pages)
-    verdict, reason = final_verdict(score, rubric)
+    # A loop that ended on tool errors (an LLM or fetch failure) did not really look, so it does not
+    # unlock the estimate-based route.
+    researched = ran and agent.stop_reason != "tool_errors"
+    verdict, reason = final_verdict(score, rubric, researched=researched)
     if ran:
         reason += f"; research stop_reason={agent.stop_reason}, {agent.fetches} fetches"
     t = rubric.thresholds
@@ -473,10 +523,14 @@ def qualify(
             "qualify_min": t.qualify_min,
             "reject_max": t.reject_max,
             "reference_year": t.reference_year,
+            "unknown_credit": t.unknown_credit,
+            "qualify_expected": t.qualify_expected,
         },
         initial_score=initial_score,
         score=score,
-        decided_with_unknowns=[] if verdict == "qualified" else list(score.unknown_signals),
+        decided_with_unknowns=(
+            [] if verdict == "qualified" and score.score_min >= t.qualify_min else list(score.unknown_signals)
+        ),
         kinds_usable=sorted(kinds),
         profile=final_profile,
         research=agent,
@@ -505,7 +559,7 @@ def render_breakdown(q: Qualification) -> str:
     applied penalty. Each line is indented four spaces so it sits under the progress line."""
     lines = [
         f"{_INDENT}{q.verdict}: {_printable(q.reason)} | score_min {q.score.score_min}, "
-        f"score_max {q.score.score_max} | rubric {q.rubric_version} sha256={q.rubric_sha256[:12]}"
+        f"score_max {q.score.score_max}, score_expected {q.score.score_expected} | rubric {q.rubric_version} sha256={q.rubric_sha256[:12]}"
     ]
     for gate in q.score.gates:
         lines.append(f"{_INDENT}gate {gate.id} {gate.status}: {_printable(gate.basis)}")

@@ -55,7 +55,7 @@ def fake_run_stage(stage, state, *, settings, send=False, live_hunter=False, ove
                        "disqualified", "disqualified")
         gray = domain.startswith("gray.")
         q = {"verdict": "insufficient_data" if gray else "qualified", "reason": "SOC 2 in progress and hiring a security engineer",
-             "score": {"score_min": 62, "score_max": 62, "signals": [
+             "score": {"score_min": 62, "score_max": 62, "score_expected": 62.0, "signals": [
                  {"id": "soc2_in_progress", "label": "SOC 2 in progress", "weight": 30, "status": "known",
                   "points_min": 30, "points_max": 30, "basis": "States it is working toward SOC 2 Type II",
                   "evidence": [{"quote": "working toward SOC 2 Type II", "source_url": f"https://{domain}/security"}]},
@@ -64,7 +64,7 @@ def fake_run_stage(stage, state, *, settings, send=False, live_hunter=False, ove
                   "evidence": [{"quote": "hiring a Security Engineer", "source_url": f"https://{domain}/careers"}]}],
                  "gates": [{"id": "G1_b2b", "label": "Sells to businesses", "status": "pass", "basis": "B2B", "evidence": []}],
                  "penalties": []},
-             "thresholds": {"qualify_min": 60, "reject_max": 45}, "rubric_version": "icp.1", "rubric_sha256": "fake",
+             "thresholds": {"qualify_min": 60, "reject_max": 45, "unknown_credit": 0.5, "qualify_expected": 55}, "rubric_version": "icp.2", "rubric_sha256": "fake",
              "research": {"stop_reason": "resolved", "fetches": 1, "steps": [
                  {"iteration": 1, "tool": "fetch_page", "url": f"https://{domain}/customers",
                   "reason": "customers page may name enterprise logos", "outcome": "fetched",

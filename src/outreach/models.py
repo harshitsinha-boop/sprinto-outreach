@@ -180,6 +180,7 @@ class RubricScore(BaseModel):
     score_min: int
     score_max: int
     unknown_signals: list[str]
+    score_expected: float | None = None  # score_min + unknown_credit x (score_max - score_min)
 
 
 class ToolSpec(BaseModel):
@@ -271,7 +272,7 @@ class Qualification(BaseModel):
     reason: str
     rubric_version: str
     rubric_sha256: str
-    thresholds: dict[str, int]
+    thresholds: dict[str, int | float]
     initial_score: RubricScore
     score: RubricScore
     decided_with_unknowns: list[str] = Field(default_factory=list)

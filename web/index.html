@@ -112,11 +112,11 @@
       </div>
       <div class="interval card" aria-labelledby="ivTitle">
         <h3 id="ivTitle">How a score becomes a verdict</h3>
-        <p>Every signal is either <strong>known</strong> (points from a quoted fact) or <strong>unknown</strong>. The company gets a <em>minimum</em> score (unknown counts 0) and a <em>maximum</em> (unknown counts full weight).</p>
+        <p>Every signal is either <strong>known</strong> (points from a quoted fact) or <strong>unknown</strong>. The company gets a <em>minimum</em> score (unknown counts 0), a <em>maximum</em> (unknown counts full weight) and an <em>expected</em> score: the minimum plus <span data-q="unknown_credit">0.5</span> of the gap to the maximum, so each unresolved signal counts for that share of its weight.</p>
         <ul class="rules">
           <li><span class="dot ok"></span><span><strong>Qualified</strong> when the minimum is at least <span data-q="qualify_min">60</span>.</span></li>
           <li><span class="dot bad"></span><span><strong>Rejected</strong> when the maximum is below <span data-q="reject_max">45</span>, or a hard gate fails.</span></li>
-          <li><span class="dot warn"></span><span><strong>Otherwise</strong> a bounded research loop fetches up to 3 more same-domain pages, each with a logged reason. Still unknown: <em>insufficient data</em>.</span></li>
+          <li><span class="dot warn"></span><span><strong>Otherwise</strong> a bounded research loop fetches up to 3 more same-domain pages, each with a logged reason. If the loop has run, at least 2 signals are known from quoted evidence and the expected score is at least <span data-q="qualify_expected">55</span>, the company is <strong>qualified on the expected score</strong>. That is an estimate and is labelled as one. Anything else is <em>insufficient data</em>.</span></li>
         </ul>
         <div class="iv-demo">
           <div class="iv-controls">

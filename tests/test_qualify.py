@@ -19,6 +19,8 @@ from conftest import (
     default_llm_responses,
 )
 from outreach.models import (
+    AgentRun,
+    ResearchOutcome,
     CompanyProfile,
     ComplianceMention,
     EnterpriseCustomer,
@@ -33,6 +35,7 @@ from outreach.models import (
 from outreach.qualify import (
     DEFAULT_RUBRIC_PATH,
     RubricError,
+    SignalRule,
     final_verdict,
     initial_verdict,
     load_rubric,
@@ -92,13 +95,14 @@ def test_default_company_qualifies_through_run_one_with_rubric_hash(ctx):
     ]
     qualify_out = rec.stages[2].output
     assert qualify_out["verdict"] == "qualified"
-    assert qualify_out["score"]["score_min"] == 80
+    assert qualify_out["score"]["score_min"] == 95
     assert qualify_out["score"]["score_max"] == 100
-    assert qualify_out["score"]["unknown_signals"] == ["funding_stage", "recent_funding"]
+    assert qualify_out["score"]["unknown_signals"] == ["funding_stage"]
+    assert qualify_out["score"]["score_expected"] == 97.5
 
     expected_sha = hashlib.sha256(DEFAULT_RUBRIC_PATH.read_bytes()).hexdigest()
     assert rec.rubric["sha256"] == expected_sha
-    assert rec.rubric["version"] == "icp.1"
+    assert rec.rubric["version"] == "icp.2"
     assert qualify_out["rubric_sha256"] == expected_sha
     on_disk = ctx.store.load(DOMAIN)
     assert on_disk.rubric["sha256"] == expected_sha
@@ -124,7 +128,7 @@ def test_consumer_company_is_disqualified_with_zero_hunter_calls(ctx, fake_hunte
     assert q.verdict == "disqualified"
     gates = {g.id: g for g in q.score.gates}
     assert gates["G1_b2b"].status == "fail"
-    assert len(q.score.signals) == 8
+    assert len(q.score.signals) == 7
 
 
 # ---- Task 2: calibration set, determinism, validation ----
@@ -204,12 +208,18 @@ def test_calibration_cases(case):
     profile = CompanyProfile.model_validate(case["profile"])
     expect = case["expect"]
 
-    q = qualify(profile, pages_for(case["kinds_usable"]), loaded)
+    research = None
+    if case.get("research") == "stub":  # the loop ran but resolved nothing more
+        def research(prof, pages, score):
+            return ResearchOutcome(profile=prof, pages=pages, agent=AgentRun(stop_reason="no_candidates"))
+
+    q = qualify(profile, pages_for(case["kinds_usable"]), loaded, research=research)
 
     assert q.initial_verdict == expect["initial_verdict"]
     assert q.verdict == expect["verdict"]
     assert q.score.score_min == expect["score_min"]
     assert q.score.score_max == expect["score_max"]
+    assert q.score.score_expected == expect["score_expected"]
     if "gate_failed" in expect:
         assert [g.id for g in q.score.gates if g.status == "fail"] == [expect["gate_failed"]]
     if "penalties" in expect:
@@ -218,7 +228,12 @@ def test_calibration_cases(case):
         assert q.decided_with_unknowns == expect["decided_with_unknowns"]
     # the same verdicts through the two public verdict functions
     assert initial_verdict(q.score, loaded.rubric) == expect["initial_verdict"]
-    assert final_verdict(q.score, loaded.rubric)[0] == expect["verdict"]
+    assert final_verdict(q.score, loaded.rubric, researched=research is not None)[0] == expect["verdict"]
+    if case.get("research") == "stub":
+        assert q.reason.startswith("qualified on expected score 62.0 (min 47..max 77)")
+        assert q.decided_with_unknowns  # an estimate says so: the unknowns are listed
+        # the same company without research stays undecided: the estimate needs the loop to have run
+        assert qualify(profile, pages_for(case["kinds_usable"]), loaded).verdict == "insufficient_data"
 
 
 def test_score_is_deterministic_and_order_independent():
@@ -253,7 +268,8 @@ def test_unknown_counts_zero_in_min_and_full_in_max():
 
     assert score.score_min == 0
     assert score.score_max == 100
-    assert len(score.unknown_signals) == 8
+    assert score.score_expected == 50.0  # unknown_credit 0.5 x (100 - 0)
+    assert len(score.unknown_signals) == 7
     assert score.unknown_signals[0] == "compliance_pursuit"
     for s in score.signals:
         assert (s.status, s.points_min, s.points_max) == ("unknown", 0, s.weight)
@@ -261,6 +277,7 @@ def test_unknown_counts_zero_in_min_and_full_in_max():
 
     one_known = score_profile(make_profile(is_b2b=True), set(), rubric)
     assert (one_known.score_min, one_known.score_max) == (10, 100)
+    assert one_known.score_expected == 55.0
 
 
 def test_penalty_lowers_both_bounds_with_floor_zero():
@@ -270,13 +287,13 @@ def test_penalty_lowers_both_bounds_with_floor_zero():
     )
     score = score_profile(both, set(), rubric)
     assert [p.id for p in score.penalties] == ["P1_mature_soc2_type2_and_iso27001"]
-    assert score.score_min == 0  # 6 - 30 floors at 0
-    assert score.score_max == 81 - 30
+    assert score.score_min == 0  # 7 - 30 floors at 0
+    assert score.score_max == 77 - 30
 
     type_two_only = make_profile(is_b2b=None, compliance=[("SOC 2 Type 2", "certified")])
     score = score_profile(type_two_only, set(), rubric)
     assert [p.id for p in score.penalties] == ["P2_soc2_type2_only"]
-    assert score.score_max == 81 - 15
+    assert score.score_max == 77 - 15
     assert all(p.evidence for p in score.penalties)
 
     type_one = make_profile(is_b2b=None, compliance=[("SOC 2 Type I", "certified")])
@@ -288,7 +305,7 @@ def test_empty_list_is_unknown_until_its_page_kind_is_read():
     profile = make_profile()
 
     blind = signal(score_profile(profile, {"home"}, rubric), "compliance_pursuit")
-    assert (blind.status, blind.points_min, blind.points_max) == ("unknown", 0, 25)
+    assert (blind.status, blind.points_min, blind.points_max) == ("unknown", 0, 30)
     assert blind.basis == "unknown: no security page read"
 
     read = signal(score_profile(profile, {"home", "security"}, rubric), "compliance_pursuit")
@@ -302,10 +319,10 @@ def test_empty_list_is_unknown_until_its_page_kind_is_read():
 @pytest.mark.parametrize(
     ("role", "points", "status"),
     [
-        ("Head of IT", 5, "known"),
+        ("Head of IT", 7, "known"),
         ("Itinerary Planner", 0, "known"),
-        ("Security Engineer", 15, "known"),
-        ("Staff SRE", 5, "known"),
+        ("Security Engineer", 20, "known"),
+        ("Staff SRE", 7, "known"),
         ("Insecurity Analyst", 0, "known"),
     ],
 )
@@ -328,8 +345,15 @@ def test_keyword_groups_match_whole_words(role, points, status):
     ],
 )
 def test_year_recency_uses_reference_year(as_of, points, status):
-    rubric = load_rubric().rubric
-    assert rubric.thresholds.reference_year == 2026
+    base = load_rubric().rubric
+    assert base.thresholds.reference_year == 2026
+    # icp.2 dropped recent_funding; the year_recency kind is still supported, so test it on a
+    # rubric with the signal added back (score_profile does not re-validate the weight sum)
+    extra = SignalRule(
+        id="recent_funding", label="Funding recency", group="C", weight=10, kind="year_recency",
+        field="stage", points={"age_le_1": 10, "age_2": 5, "older": 0}, target_kinds=["about"],
+    )
+    rubric = base.model_copy(update={"signals": [*base.signals, extra]})
     score = score_profile(make_profile(stage="series_a", as_of=as_of), set(), rubric)
     recency = signal(score, "recent_funding")
     assert recency.status == status
@@ -348,7 +372,7 @@ def _broken_copy(tmp_path, old: str, new: str) -> Path:
 @pytest.mark.parametrize(
     ("old", "new", "message"),
     [
-        ("weight = 25", "weight = 20", "sum to 100"),
+        ("weight = 30", "weight = 20", "sum to 100"),
         ('kind = "count"', 'kind = "median"', "invalid rubric schema"),
         ("qualify_min = 60", "qualify_min = 40", "must be above"),
         ('target_kinds = ["customers"]', 'target_kinds = ["blog"]', "not a page kind"),
@@ -369,7 +393,7 @@ def test_rubric_refuses_invalid_toml_and_weight_mismatch(tmp_path):
 
     # weights still sum to 100 but one signal's points no longer reach its weight
     text = DEFAULT_RUBRIC_PATH.read_text(encoding="utf-8")
-    swapped = text.replace("weight = 25", "weight = 24", 1).replace("weight = 15", "weight = 16", 1)
+    swapped = text.replace("weight = 30", "weight = 29", 1).replace("weight = 20", "weight = 21", 1)
     path = tmp_path / "icp.toml"
     path.write_text(swapped, encoding="utf-8")
     with pytest.raises(RubricError, match="differ from weight"):
@@ -391,10 +415,26 @@ def test_repo_rubric_thresholds_are_pinned():
     """Changing the thresholds or the version means editing this test, on purpose: the
     calibration set was written against these numbers before any demo domain was scored."""
     rubric = load_rubric().rubric
-    assert rubric.version == "icp.1"
+    assert rubric.version == "icp.2"
     assert rubric.thresholds.qualify_min == 60
     assert rubric.thresholds.reject_max == 45
+    assert rubric.thresholds.unknown_credit == 0.5
+    assert rubric.thresholds.qualify_expected == 55
+    assert {s.id: s.weight for s in rubric.signals} == {
+        "b2b_software": 10,
+        "funding_stage": 5,
+        "headcount_band": 5,
+        "compliance_pursuit": 30,
+        "enterprise_customers": 20,
+        "security_hiring": 20,
+        "regulated_vertical": 10,
+    }
     assert sum(s.weight for s in rubric.signals) == 100
+    assert [p.id for p in rubric.penalties] == [
+        "P1_mature_soc2_type2_and_iso27001",
+        "P2_soc2_type2_only",
+    ]
+    assert [(p.points) for p in rubric.penalties] == [30, 15]
 
 
 # ---- Task 3: visible verdicts ----
@@ -415,8 +455,8 @@ def test_render_breakdown_lists_gates_signals_and_penalties():
     first = lines[0]
     assert "disqualified" in first
     assert q.reason in first
-    assert "score_min 6" in first and "score_max 16" in first
-    assert f"icp.1 sha256={q.rubric_sha256[:12]}" in first
+    assert "score_min 10" in first and "score_max 10" in first and "score_expected 10.0" in first
+    assert f"icp.2 sha256={q.rubric_sha256[:12]}" in first
 
     assert any("G1_b2b" in ln and "pass" in ln for ln in lines)
     assert any("G3_size_ceiling" in ln and "pass" in ln for ln in lines)
@@ -427,12 +467,11 @@ def test_render_breakdown_lists_gates_signals_and_penalties():
         "compliance_pursuit",
         "enterprise_customers",
         "security_hiring",
-        "recent_funding",
         "regulated_vertical",
     ):
         assert any(f"signal {signal_id} " in ln for ln in lines), signal_id
-    assert any("compliance_pursuit" in ln and "+6" in ln and "known" in ln for ln in lines)
-    assert any("recent_funding" in ln and "+0..10" in ln and "unknown" in ln for ln in lines)
+    assert any("compliance_pursuit" in ln and "+7" in ln and "known" in ln for ln in lines)
+    assert not any("recent_funding" in ln for ln in lines)
     assert any("penalty P1_mature_soc2_type2_and_iso27001" in ln and "-30" in ln for ln in lines)
     assert any('"We hold a SOC 2 Type II report" (https://reject_mature_certified.example/)' in ln for ln in lines)
 
@@ -579,8 +618,8 @@ def test_batch_prints_breakdowns_and_spends_hunter_only_on_qualified(ctx, fake_h
     second = text.index("[2/3] thin.example -> insufficient_data")
     third = text.index("[3/3] good.example -> qualified")
     assert first < text.index("gate G1_b2b fail") < second
-    assert second < text.index("insufficient_data: score 25..90") < third
-    assert third < text.rindex("qualified: score_min 80")
+    assert second < text.index("insufficient_data: score 18..88") < third
+    assert third < text.rindex("qualified: score_min 95")
     assert text.endswith("\n")
 
 
@@ -589,12 +628,12 @@ def test_summary_carries_rubric_identity(ctx, tmp_path):
     summary = run_batch(["good.example"], ctx)
     sha = hashlib.sha256(DEFAULT_RUBRIC_PATH.read_bytes()).hexdigest()
 
-    assert summary.rubric == {"version": "icp.1", "sha256": sha, "file": "icp.toml"}
+    assert summary.rubric == {"version": "icp.2", "sha256": sha, "file": "icp.toml"}
     lines = render_summary(summary).split("\n")
     assert lines[0] == "SUMMARY mode=dry_run hunter=fixture"
-    assert lines[1] == f"rubric icp.1 sha256={sha[:12]}"
+    assert lines[1] == f"rubric icp.2 sha256={sha[:12]}"
 
     path = write_summary(summary, tmp_path / "out")
     on_disk = json.loads(path.read_text())
-    assert on_disk["rubric"]["version"] == "icp.1"
+    assert on_disk["rubric"]["version"] == "icp.2"
     assert on_disk["rubric"]["sha256"] == sha

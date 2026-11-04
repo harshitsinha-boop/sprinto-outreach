@@ -68,7 +68,7 @@ TRUST_TEXT = (
 
 
 def thin_profile() -> CompanyProfile:
-    """What the home page alone supports: 30 known points, four unknown signals (30..95)."""
+    """What the home page alone supports: 24 known points, four unknown signals (24..99)."""
     return CompanyProfile(
         name=EvidencedText(value="Ledgerline", quote=HOME_BUSINESS, source_url=HOME_URL),
         offering=EvidencedText(
@@ -77,9 +77,7 @@ def thin_profile() -> CompanyProfile:
             source_url=HOME_URL,
         ),
         is_b2b=EvidencedBool(value=True, quote=HOME_BUSINESS, source_url=HOME_URL),
-        stage=StageFact(
-            value="seed", as_of=None, quote="backed by a seed round", source_url=HOME_URL
-        ),
+        stage=None,  # unknown on purpose: funding_stage is the signal an about page can still resolve
         headcount=HeadcountFact(value="11-50", quote=HOME_HEADCOUNT, source_url=HOME_URL),
         compliance_mentions=[],
         hiring_signals=[],
@@ -139,9 +137,9 @@ def test_gray_band_company_researches_one_page_and_qualifies(ctx):
     assert [s.name for s in rec.stages] == ["scrape", "extract", "qualify", "poc", "draft", "send"]
     q = stage_output(rec, "qualify")
     assert q["initial_verdict"] == "loop"
-    assert (q["initial_score"]["score_min"], q["initial_score"]["score_max"]) == (30, 95)
+    assert (q["initial_score"]["score_min"], q["initial_score"]["score_max"]) == (24, 99)
     assert q["verdict"] == "qualified"
-    assert q["score"]["score_min"] == 70
+    assert q["score"]["score_min"] == 74
     research = q["research"]
     assert research["stop_reason"] == "sufficient_data"
     assert research["fetches"] == 1
@@ -152,7 +150,7 @@ def test_gray_band_company_researches_one_page_and_qualifies(ctx):
     assert step["page_kind"] == "security"
     assert step["reason"]
     assert {"compliance_pursuit", "security_hiring"} <= set(step["resolved_signals"])
-    assert (step["score_min"], step["score_max"]) == (70, 70 + 15 + 10)  # customers and recent_funding unknown
+    assert (step["score_min"], step["score_max"]) == (74, 74 + 20 + 5)  # customers and funding_stage unknown
     assert [c["purpose"] for c in llm.calls] == ["extract", "research_extract", "pain_points", "draft"]
     assert [t["kind"] for t in llm.tool_turns] == ["send"]
     assert hunter.calls == ["example.com"]
@@ -208,7 +206,7 @@ def empty_profile() -> CompanyProfile:
 
 
 def stepwise_profiles() -> list[CompanyProfile]:
-    """One more signal per page, none enough to leave the gray band: 35..85, 40..75, 50..60."""
+    """One more signal per page, none enough to leave the gray band: 31..86, 38..73, 50..55 (expected 52.5, below 55)."""
     customers = empty_profile().model_copy(
         update={
             "enterprise_customers": [
@@ -420,12 +418,12 @@ def test_loop_stops_at_three_iterations():
     assert run is not None
     assert run.stop_reason == "max_iters"
     assert (run.iterations, run.fetches, run.llm_turns) == (3, 3, 3)
-    assert [(s.score_min, s.score_max) for s in run.steps] == [(35, 85), (40, 75), (50, 60)]
+    assert [(s.score_min, s.score_max) for s in run.steps] == [(31, 86), (38, 73), (50, 55)]
     assert [t["kind"] for t in llm.tool_turns] == ["send", "respond", "respond"]
     assert fetcher.calls == ALL_RESEARCH_URLS[:3]
     assert [c["purpose"] for c in llm.calls] == ["research_extract"] * 3
     assert q.verdict == "insufficient_data"
-    assert q.decided_with_unknowns == ["recent_funding"]
+    assert q.decided_with_unknowns == ["funding_stage"]
     assert "research stop_reason=max_iters, 3 fetches" in q.reason
 
 
@@ -554,7 +552,7 @@ def test_unresolved_loop_company_makes_zero_hunter_calls(ctx):
     assert hunter.calls == []
     result = rec.stages[-1].output["result"]
     assert len(result["research"]["steps"]) == 3
-    assert result["decided_with_unknowns"] == ["recent_funding"]
+    assert result["decided_with_unknowns"] == ["funding_stage"]
 
 
 def test_breakdown_shows_research_steps():

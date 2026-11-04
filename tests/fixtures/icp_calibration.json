@@ -1,5 +1,5 @@
 {
-  "rubric_version": "icp.1",
+  "rubric_version": "icp.2",
   "cases": [
     {
       "id": "fit_series_b_full_signals",
@@ -76,7 +76,8 @@
         "initial_verdict": "qualified",
         "verdict": "qualified",
         "score_min": 100,
-        "score_max": 100
+        "score_max": 100,
+        "score_expected": 100.0
       }
     },
     {
@@ -148,8 +149,9 @@
       "expect": {
         "initial_verdict": "qualified",
         "verdict": "qualified",
-        "score_min": 93,
-        "score_max": 93
+        "score_min": 92,
+        "score_max": 92,
+        "score_expected": 92.0
       }
     },
     {
@@ -226,8 +228,9 @@
       "expect": {
         "initial_verdict": "qualified",
         "verdict": "qualified",
-        "score_min": 70,
-        "score_max": 90
+        "score_min": 83,
+        "score_max": 88,
+        "score_expected": 85.5
       }
     },
     {
@@ -269,9 +272,10 @@
       "expect": {
         "initial_verdict": "disqualified",
         "verdict": "disqualified",
-        "score_min": 8,
-        "score_max": 28,
-        "gate_failed": "G1_b2b"
+        "score_min": 4,
+        "score_max": 9,
+        "gate_failed": "G1_b2b",
+        "score_expected": 6.5
       }
     },
     {
@@ -358,9 +362,10 @@
       "expect": {
         "initial_verdict": "disqualified",
         "verdict": "disqualified",
-        "score_min": 52,
-        "score_max": 62,
-        "gate_failed": "G3_size_ceiling"
+        "score_min": 63,
+        "score_max": 63,
+        "gate_failed": "G3_size_ceiling",
+        "score_expected": 63.0
       }
     },
     {
@@ -446,11 +451,12 @@
       "expect": {
         "initial_verdict": "disqualified",
         "verdict": "disqualified",
-        "score_min": 6,
-        "score_max": 16,
+        "score_min": 10,
+        "score_max": 10,
         "penalties": [
           "P1_mature_soc2_type2_and_iso27001"
-        ]
+        ],
+        "score_expected": 10.0
       }
     },
     {
@@ -492,14 +498,14 @@
       "expect": {
         "initial_verdict": "loop",
         "verdict": "insufficient_data",
-        "score_min": 25,
-        "score_max": 90,
+        "score_min": 18,
+        "score_max": 88,
         "decided_with_unknowns": [
           "compliance_pursuit",
           "enterprise_customers",
-          "security_hiring",
-          "recent_funding"
-        ]
+          "security_hiring"
+        ],
+        "score_expected": 53.0
       }
     },
     {
@@ -571,9 +577,59 @@
       "expect": {
         "initial_verdict": "loop",
         "verdict": "disqualified",
-        "score_min": 48,
-        "score_max": 48,
-        "decided_with_unknowns": []
+        "score_min": 52,
+        "score_max": 52,
+        "decided_with_unknowns": [],
+        "score_expected": 52.0
+      }
+    },
+    {
+      "id": "fit_expected_after_research",
+      "note": "Series-A-like: stage and headcount unstated, SOC 2 in progress, one named customer, careers page not read so security hiring is unknown. Qualified only on the expected score after research ran.",
+      "research": "stub",
+      "kinds_usable": [
+        "home",
+        "security",
+        "customers"
+      ],
+      "profile": {
+        "name": null,
+        "offering": {
+          "value": "analytics platform",
+          "quote": "a quote long enough",
+          "source_url": "https://case.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "a quote long enough",
+          "source_url": "https://case.example/"
+        },
+        "stage": null,
+        "headcount": null,
+        "compliance_mentions": [
+          {
+            "framework": "SOC 2",
+            "status": "in_progress",
+            "as_of": null,
+            "quote": "quote about SOC 2 in_progress",
+            "source_url": "https://case.example/"
+          }
+        ],
+        "hiring_signals": [],
+        "enterprise_customers": [
+          {
+            "name": "Acme Corp",
+            "quote": "Acme Corp is a customer",
+            "source_url": "https://case.example/"
+          }
+        ]
+      },
+      "expect": {
+        "initial_verdict": "loop",
+        "verdict": "qualified",
+        "score_min": 47,
+        "score_max": 77,
+        "score_expected": 62.0
       }
     }
   ]

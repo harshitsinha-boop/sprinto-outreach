@@ -7,7 +7,7 @@ const API_STAGES = ["scrape", "extract", "qualify", "poc", "draft", "send"];
 const STEPS = [
   { id: "scrape", api: "scrape", icon: "globe", name: "Scrape", tool: "HTTP fetch", what: "Reads the homepage, about, security, customers and careers pages for raw signal." },
   { id: "extract", api: "extract", icon: "list", name: "Extract", tool: "Gemini", what: "Turns page text into structured company facts, each with a verbatim quote and source URL." },
-  { id: "qualify", api: "qualify", icon: "target", name: "Qualify", tool: "Gemini + ICP rubric", what: "Scores the company against the ICP as a min/max interval; an agent loop fetches more pages when data is missing." },
+  { id: "qualify", api: "qualify", icon: "target", name: "Qualify", tool: "Gemini + ICP rubric", what: "Scores the company against the ICP as a min, max and expected score; an agent loop fetches more pages when data is missing." },
   { id: "poc", api: "poc", icon: "user-search", name: "Find contact", tool: "Hunter.io", what: "Searches the domain and ranks the people it finds by company-size band to pick the decision-maker." },
   { id: "pain", api: "draft", icon: "bulb", name: "Pain points", tool: "Gemini", what: "Picks the two most likely pains for that person's role, each tied to evidence from the company's own pages." },
   { id: "draft", api: "draft", icon: "pen", name: "Draft email", tool: "Gemini + validator", what: "Writes a short email to the person by name with a specific hook, then validates length, links and claims." },
@@ -30,7 +30,7 @@ const FAQ = [
   ["What stops it burning credits or being abused?", "<ul><li>Per-IP request and run-start limits, a live Hunter search budget, and a cap on live sends.</li><li>At most 5 domains per run and 3 runs per browser session.</li><li>Strict domain validation: public hostnames only, no IPs, localhost or paths.</li></ul>"],
   ["How is untrusted page text handled?", "<p>Website text is treated as data, never as instructions. Extracted facts must carry a quote that actually appears on the page, facts that fail that check are dropped, and pages that look like prompt injection are flagged.</p>"],
   ["Which claims can the email make?", "<p>Only facts quoted from the company's own pages (evidence ids E1, E2...) and a short whitelist of Sprinto claims (S1, S2). The validator checks the greeting uses the person's first name, the body is 50 to 90 words, there are no URLs, and every claim maps to a known id. The email ends with a CAN-SPAM / GDPR style footer.</p>"],
-  ["What are the known limits?", "<ul><li>Company sites rarely state funding or headcount, so many real companies land in the unknown band. You can continue them with a logged manual override.</li><li>Hunter may have no named person for a small company; the run then stops with no contact.</li><li>Rate limits and budgets are best effort per server instance and reset on a cold start.</li><li>Rubric weights are starting hypotheses, not measured truth.</li></ul>"],
+  ["What are the known limits?", "<ul><li>Company sites rarely state funding or headcount. Rubric icp.2 gives those facts little weight and, after research, can qualify a company on an expected score (an estimate, labelled as one); anything still undecided can be continued with a logged manual override.</li><li>Hunter may have no named person for a small company; the run then stops with no contact.</li><li>Rate limits and budgets are best effort per server instance and reset on a cold start.</li><li>Rubric weights are starting hypotheses, not measured truth.</li></ul>"],
   ["How do I rerun or batch it?", "<p>Edit the domain list and press Run pipeline again. Results for a domain are cached server side, so rerunning the same domain makes no new model calls. Use Clear results to start fresh, and Download decision log to keep a copy.</p>"],
 ];
 
@@ -90,27 +90,35 @@ function renderStatic() {
 }
 
 /* ---------- interval bar ---------- */
-function ivBar(min, max, qmin, rmax, compact) {
+function ivBar(min, max, qmin, rmax, compact, expected, qexp) {
   const c = (n) => Math.max(0, Math.min(100, n));
   const left = c(min), width = Math.max(1, c(max) - c(min));
-  return `<div class="ivbar ${compact ? "compact" : ""}" role="img" aria-label="Score interval ${min} to ${max} out of 100. Reject below ${rmax}, qualify at ${qmin} or above.">
+  const hasExp = expected != null && qexp != null;
+  return `<div class="ivbar ${compact ? "compact" : ""}" role="img" aria-label="Score interval ${min} to ${max} out of 100${hasExp ? `, expected score ${expected}` : ""}. Reject below ${rmax}, qualify at ${qmin} or above${hasExp ? `, or on an expected score of ${qexp} or above after research` : ""}.">
     <div class="iv-range" style="left:${left}%;width:${width}%"></div>
+    ${hasExp ? `<div class="iv-mark" style="left:${c(expected)}%"><span>expected ${expected}</span></div>` : ""}
     <div class="iv-mark" style="left:${rmax}%"><span>reject &lt; ${rmax}</span></div>
     <div class="iv-mark" style="left:${qmin}%"><span>qualify &ge; ${qmin}</span></div></div>
-    <div class="iv-scale"><span>0</span><span>min ${min}, max ${max}</span><span>100</span></div>`;
+    <div class="iv-scale"><span>0</span><span>min ${min}, max ${max}${hasExp ? `, expected ${expected} (qualify on an estimate at ${qexp}+ after research)` : ""}</span><span>100</span></div>`;
 }
-function ivVerdict(min, max, qmin, rmax) {
+const expectedOf = (min, max, credit) => Math.round((min + credit * (max - min)) * 10) / 10;
+function ivVerdict(min, max, qmin, rmax, qexp, credit) {
+  const exp = expectedOf(min, max, credit);
   if (min >= qmin) return ["Qualified: even counting every unknown as zero, the score clears " + qmin + ".", "ok"];
   if (max < rmax) return ["Rejected: even counting every unknown at full weight, the score stays below " + rmax + ".", "bad"];
-  return ["Unknown band: the research loop fetches up to 3 more pages, then the company is qualified, rejected, or marked insufficient data.", "warn"];
+  const base = "Unknown band: the research loop fetches up to 3 more pages. Expected score " + exp + " (each unresolved signal counts " + credit + " of its weight). ";
+  if (exp >= qexp) return [base + "After research, with at least 2 signals known from evidence, this qualifies on the expected score (an estimate, labelled as such). Without research it stays undecided.", "warn"];
+  return [base + "That is below " + qexp + ", so unless the research finds more evidence it ends as insufficient data.", "warn"];
 }
 function updateIvDemo() {
   let min = +$("ivMin").value, max = +$("ivMax").value;
   if (max < min) { max = min; $("ivMax").value = String(max); }
   $("ivMinOut").textContent = min; $("ivMaxOut").textContent = max;
   const qmin = rubric ? rubric.qualify_min : 60, rmax = rubric ? rubric.reject_max : 45;
-  $("ivBar").innerHTML = ivBar(min, max, qmin, rmax, false);
-  const [txt] = ivVerdict(min, max, qmin, rmax);
+  const credit = rubric && rubric.unknown_credit != null ? rubric.unknown_credit : 0.5;
+  const qexp = rubric && rubric.qualify_expected != null ? rubric.qualify_expected : 55;
+  $("ivBar").innerHTML = ivBar(min, max, qmin, rmax, false, expectedOf(min, max, credit), qexp);
+  const [txt] = ivVerdict(min, max, qmin, rmax, qexp, credit);
   $("ivVerdict").textContent = txt;
 }
 ["ivMin", "ivMax"].forEach((id) => $(id).addEventListener("input", updateIvDemo));
@@ -392,10 +400,12 @@ function qualifyDetail(r) {
   const sc = q.score || {};
   const th = q.thresholds || {};
   const qmin = th.qualify_min ?? (rubric && rubric.qualify_min) ?? 60, rmax = th.reject_max ?? (rubric && rubric.reject_max) ?? 45;
+  const qexp = th.qualify_expected ?? (rubric && rubric.qualify_expected) ?? null;
   let h = "";
   if (q.override) h += `<div class="override-banner">${ico("alert")}<span>Manual override: ${esc(q.override_note || "continued despite insufficient data")}</span></div>`;
   h += `<p><b>Rubric verdict:</b> <span class="badge ${q.verdict === "qualified" ? "b-ok" : q.verdict === "disqualified" ? "b-bad" : "b-warn"}">${esc(q.verdict)}</span> ${esc(q.reason || "")}</p>`;
-  if (sc.score_min != null) h += ivBar(sc.score_min, sc.score_max, qmin, rmax, true);
+  if (sc.score_min != null) h += ivBar(sc.score_min, sc.score_max, qmin, rmax, true, sc.score_expected, qexp);
+  if (sc.score_expected != null && qexp != null && sc.score_min < qmin && q.verdict === "qualified") h += `<p class="hint"><b>Qualified on an estimate, not a certainty:</b> the minimum ${esc(sc.score_min)} is below ${esc(qmin)}, but after research the expected score ${esc(sc.score_expected)} reached ${esc(qexp)}. Unresolved signals counted ${esc(th.unknown_credit ?? 0.5)} of their weight.</p>`;
   if (q.rubric_version) h += `<p class="hint">Rubric ${esc(q.rubric_version)} <span class="hash">sha256 ${esc(q.rubric_sha256 || "")}</span></p>`;
   if ((sc.gates || []).length) h += `<h4>Hard gates</h4>` + tableWrap(`<table class="data"><caption class="sr">Gates</caption><thead><tr><th scope="col">Gate</th><th scope="col">Result</th><th scope="col">Basis</th></tr></thead><tbody>${sc.gates.map((g) => `<tr><td>${esc(g.label || g.id)}</td><td>${esc(g.status)}</td><td>${esc(g.basis)}${(g.evidence || []).map((e) => quote(e.quote, e.source_url)).join("")}</td></tr>`).join("")}</tbody></table>`);
   if ((sc.signals || []).length) {
@@ -605,7 +615,7 @@ function buildMarkdown() {
     if (qr) {
       if (qr.override) out.push(``, `> **MANUAL OVERRIDE: qualified by manual override, not by the rubric.** ${qr.override_note || ""}`);
       const sc = qr.score || {};
-      out.push(``, `Rubric verdict: ${qr.verdict}. ${qr.reason || ""}`, `Score interval: ${sc.score_min} to ${sc.score_max} (qualify at ${(qr.thresholds || {}).qualify_min}, reject below ${(qr.thresholds || {}).reject_max}).`, "");
+      out.push(``, `Rubric verdict: ${qr.verdict}. ${qr.reason || ""}`, `Score interval: ${sc.score_min} to ${sc.score_max}, expected ${sc.score_expected ?? "n/a"} (qualify at ${(qr.thresholds || {}).qualify_min}, or on expected score at ${(qr.thresholds || {}).qualify_expected ?? "n/a"} after research; reject below ${(qr.thresholds || {}).reject_max}).`, "");
       (sc.signals || []).forEach((s) => out.push(`- ${s.label || s.id} (weight ${s.weight}, ${s.status}, ${s.status === "known" ? "+" + s.points_min : "0.." + s.weight}): ${s.basis}${(s.evidence || []).map((e) => mdQuote(e.quote, e.source_url)).join("")}`));
       (sc.gates || []).forEach((g) => out.push(`- gate ${g.label || g.id}: ${g.status}. ${g.basis}`));
       (sc.penalties || []).forEach((p) => out.push(`- penalty ${p.label || p.id}: -${p.points}`));
