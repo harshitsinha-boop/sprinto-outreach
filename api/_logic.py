@@ -288,7 +288,12 @@ class WebApp:
             )
         live_hunter = stage == "poc" and self._take_hunter()
         state = {**state, "domain": domain}  # the validated domain always wins
-        result = stage_fn(stage, state, settings=settings, send=send, live_hunter=live_hunter)
+        kwargs = {}
+        if stage == "qualify" and req.get("override_insufficient") is True:
+            kwargs["override_insufficient"] = True  # only ever forwarded for qualify, only if true
+        result = stage_fn(
+            stage, state, settings=settings, send=send, live_hunter=live_hunter, **kwargs
+        )
         if not isinstance(result, dict):
             raise RequestError(500, "internal", "pipeline returned an unexpected value")
         out = dict(result)

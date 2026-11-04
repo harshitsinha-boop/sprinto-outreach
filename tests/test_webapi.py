@@ -92,3 +92,65 @@ def test_dirs_move_under_data_dir_on_vercel(settings, monkeypatch, tmp_path):
     assert default_data_dir() is not None and "outreach" in str(default_data_dir())
     monkeypatch.setenv("OUTREACH_DATA_DIR", str(tmp_path / "d"))
     assert default_data_dir() == Path(tmp_path / "d")
+
+
+# --- manual override of the insufficient_data gray band ------------------------------------------
+import pytest  # noqa: E402
+
+from outreach import stages as stages_mod  # noqa: E402
+from outreach.stages import StopStage  # noqa: E402
+
+_REAL_QUALIFY = stages_mod.stage_qualify
+
+
+def _force_verdict(monkeypatch, verdict):
+    def fake(ctx, domain, prev):
+        q = _REAL_QUALIFY(ctx, domain, prev)
+        q2 = q.model_copy(update={"verdict": verdict, "reason": f"forced {verdict}"})
+        raise StopStage(verdict, q2.reason, output=q2)
+
+    monkeypatch.setitem(stages_mod.STAGE_FUNCS, "qualify", fake)
+
+
+def _to_qualify(settings, **extra):
+    state = {"domain": "example.com"}
+    for stage in ("scrape", "extract"):
+        state = run_stage(stage, state, settings=settings, **_seams())["state"]
+    return run_stage("qualify", state, settings=settings, **_seams(), **extra), state
+
+
+def test_insufficient_data_stops_without_override(settings, monkeypatch):
+    _force_verdict(monkeypatch, "insufficient_data")
+    r, _ = _to_qualify(settings)
+    assert (r["status"], r["stop_reason"]) == ("stopped", "insufficient_data")
+    assert "override" not in r["state"]
+
+
+def test_override_proceeds_and_downstream_stages_work(settings, monkeypatch):
+    _force_verdict(monkeypatch, "insufficient_data")
+    r, _ = _to_qualify(settings, override_insufficient=True)
+    assert r["status"] == "ok" and r["state"]["override"] == "insufficient_data"
+    assert "manual override" in r["detail"] and "not by the rubric" in r["detail"]
+    assert r["result"]["override"] == "insufficient_data"
+    assert r["result"]["verdict"] == "insufficient_data"  # truthful verdict kept
+    assert r["result"]["score"]["signals"] and r["result"]["rubric_sha256"]
+    state = json.loads(json.dumps(r["state"]))
+    for stage in ("poc", "draft", "send"):
+        r = run_stage(stage, state, settings=settings, **_seams())
+        assert r["status"] == "ok", (stage, r["detail"])
+        state = json.loads(json.dumps(r["state"]))
+    assert state["override"] == "insufficient_data"
+
+
+def test_override_never_applies_to_disqualified(settings, monkeypatch):
+    _force_verdict(monkeypatch, "disqualified")
+    r, _ = _to_qualify(settings, override_insufficient=True)
+    assert (r["status"], r["stop_reason"]) == ("stopped", "disqualified")
+    assert "override" not in r["state"]
+
+
+@pytest.mark.parametrize("flag", [1, "true", "yes", None, 0])
+def test_override_flag_must_be_exactly_true(settings, monkeypatch, flag):
+    _force_verdict(monkeypatch, "insufficient_data")
+    r, _ = _to_qualify(settings, override_insufficient=flag)
+    assert r["status"] == "stopped"

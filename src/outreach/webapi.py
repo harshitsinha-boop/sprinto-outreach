@@ -113,6 +113,7 @@ def run_stage(
     fetcher: Any = None,
     hunter: Any = None,
     sender: Callable | None = None,
+    override_insufficient: bool = False,
 ) -> dict:
     """Run one stage. Never raises: every outcome is `ok`, `stopped` (an expected, logged stop
     such as disqualified or no_contact) or `failed` (an exception, message redacted)."""
@@ -149,6 +150,14 @@ def run_stage(
         )
         output = STAGE_FUNCS[stage](ctx, domain, prev)
     except StopStage as stop:
+        if (
+            stage == "qualify"
+            and override_insufficient is True
+            and stop.reason == "insufficient_data"
+            and stop.output is not None
+            and getattr(stop.output, "verdict", None) == "insufficient_data"
+        ):
+            return _manual_override(stage, state, stop.output, settings)
         result = _display(stage, stop.output) if stop.output is not None else None
         new_state = {**state, "stopped_at": stage, "stop_reason": stop.reason}
         if stop.output is not None:
@@ -172,6 +181,23 @@ def run_stage(
     if stage == "send" and out.getvalue():
         new_state["send_log"] = redact(out.getvalue(), settings)
     return _result(stage, "ok", new_state, detail=detail, result=_display(stage, output))
+
+
+def _manual_override(stage: str, state: dict, q, settings: Settings) -> dict:
+    """Proceed past the gray band on explicit user request. Only `insufficient_data` reaches here:
+    a `disqualified` verdict (reject threshold or failed hard gate) never does. The Qualification
+    keeps its true verdict and full breakdown; the override is recorded beside it."""
+    note = (
+        f"manual override: score {q.score.score_min}..{q.score.score_max} in the unknown band; "
+        "continuing (qualified by manual override, not by the rubric)"
+    )
+    new_state = {k: v for k, v in state.items() if k not in ("stopped_at", "stop_reason")}
+    new_state[stage] = q.model_dump(mode="json")
+    new_state["override"] = "insufficient_data"
+    result = _display(stage, q)
+    result["override"] = "insufficient_data"
+    result["override_note"] = note
+    return _result(stage, "ok", new_state, detail=redact(note, settings), result=result)
 
 
 __all__ = ["run_stage", "STAGE_ORDER", "default_data_dir", "stages_mod"]

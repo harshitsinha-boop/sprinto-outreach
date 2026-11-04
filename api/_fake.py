@@ -1,7 +1,7 @@
 """Offline fake pipeline with the same signature as outreach.webapi.run_stage.
 
 Used by `scripts/serve_web.py --fake` so the UI can be tried with no keys and no network.
-A domain starting with `stop.` stops at qualify; one starting with `fail.` fails at scrape.
+A domain starting with `stop.` stops at qualify (disqualified), `gray.` stops as insufficient_data unless overridden; one starting with `fail.` fails at scrape.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ def fake_settings():
     return FAKE_SETTINGS
 
 
-def fake_run_stage(stage, state, *, settings, send=False, live_hunter=False):
+def fake_run_stage(stage, state, *, settings, send=False, live_hunter=False, override_insufficient=False):
     domain = state.get("domain", "example.com")
     time.sleep(DELAY)
     state = {**state, "done": [*state.get("done", []), stage]}
@@ -41,7 +41,8 @@ def fake_run_stage(stage, state, *, settings, send=False, live_hunter=False):
         if domain.startswith("stop."):
             return out("stopped", {"verdict": "disqualified", "reason": "fails the B2B gate"},
                        "disqualified", "disqualified")
-        q = {"verdict": "qualified", "reason": "SOC 2 in progress and hiring a security engineer",
+        gray = domain.startswith("gray.")
+        q = {"verdict": "insufficient_data" if gray else "qualified", "reason": "SOC 2 in progress and hiring a security engineer",
              "score": {"score_min": 62, "score_max": 62, "signals": [
                  {"id": "soc2_in_progress", "label": "SOC 2 in progress", "weight": 30, "status": "known",
                   "points_min": 30, "points_max": 30, "basis": "States it is working toward SOC 2 Type II",
@@ -50,6 +51,14 @@ def fake_run_stage(stage, state, *, settings, send=False, live_hunter=False):
                   "points_min": 32, "points_max": 32, "basis": "Open Security Engineer role",
                   "evidence": [{"quote": "hiring a Security Engineer", "source_url": f"https://{domain}/careers"}]}],
                  "gates": [], "penalties": []}}
+        if gray and override_insufficient is True:
+            state = {**state, "override": "insufficient_data"}
+            q["override"] = "insufficient_data"
+            q["override_note"] = "manual override: score 45..60 in the unknown band; continuing"
+            return out(result=q, detail=q["override_note"])
+        if gray:
+            q["score"]["score_min"], q["score"]["score_max"] = 45, 60
+            return out("stopped", q, "score 45..60 is in the unknown band", "insufficient_data")
         return out(result=q, detail="qualified (score 62)")
     if stage == "poc":
         return out(result={"first_name": "Jane", "last_name": "Doe", "position": "CTO",

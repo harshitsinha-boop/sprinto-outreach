@@ -89,6 +89,13 @@
     <ol class="stages" id="stages" aria-live="polite"></ol>
   </section>
 
+  <section class="card hidden" id="overrideCard">
+    <h2>Score is in the unknown band</h2>
+    <p class="meta" id="overrideText" style="margin:0 0 10px"></p>
+    <button id="overrideBtn" class="secondary">Continue anyway (manual override, logged)</button>
+    <div class="hint">The rubric could not decide (insufficient data). Continuing is your call, it is recorded in the decision log, and it is never offered for disqualified companies. Mail still goes only to the owner.</div>
+  </section>
+
   <section class="card hidden" id="sendCard">
     <h2>Draft ready</h2>
     <div id="draftPreview"></div>
@@ -199,21 +206,45 @@ async function start() {
   if (runsUsed() >= MAX_RUNS) { $("runErr").textContent = `Session limit reached (${MAX_RUNS} runs). Close this tab and reopen to continue.`; return; }
   busy = true; $("runBtn").disabled = true;
   store.setItem("runs", String(runsUsed() + 1)); showRuns();
-  state = {}; results = {}; owner = "";
+  state = {}; results = {}; owner = ""; $("overrideCard").classList.add("hidden");
   $("stages").innerHTML = ""; $("progressCard").classList.remove("hidden");
   ["sendCard", "logCard"].forEach(i => $(i).classList.add("hidden"));
   STAGES.forEach(s => stageRow(s, "pending", ""));
+  await runFrom(0);
+}
+
+async function runFrom(idx) {
   let stopped = false;
-  for (const s of STAGES.slice(0, 5)) {
+  for (const s of STAGES.slice(idx, 5)) {
     const r = await runStage(s);
-    if (!r.ok) { stopped = true; break; }
+    if (!r.ok) {
+      stopped = true;
+      const d = r.data || {};
+      if (s === "qualify" && d.status === "stopped" && d.stop_reason === "insufficient_data") {
+        const sc = (d.result && d.result.score) || {};
+        $("overrideText").textContent = `Score ${sc.score_min}..${sc.score_max}: not enough evidence to qualify or reject. See the breakdown below.`;
+        $("overrideCard").classList.remove("hidden");
+      }
+      break;
+    }
   }
   if (!stopped) {
+    $("overrideCard").classList.add("hidden");
     STAGES.slice(5).forEach(s => stageRow(s, "pending", "Waiting for your confirmation below."));
     showSendCard();
   } else { renderLog(); }
   busy = false; $("runBtn").disabled = false;
 }
+
+async function overrideContinue() {
+  if (busy) return;
+  busy = true; $("runBtn").disabled = true; $("overrideBtn").disabled = true;
+  const r = await runStage("qualify", { override_insufficient: true });
+  $("overrideBtn").disabled = false;
+  if (!r.ok) { busy = false; $("runBtn").disabled = false; renderLog(); return; }
+  await runFrom(3);
+}
+$("overrideBtn").addEventListener("click", overrideContinue);
 
 function findDraft() {
   const d = results.draft && results.draft.result;
@@ -252,7 +283,7 @@ function renderQualify(r) {
   if (!r) return "";
   const q = r.qualification || r;
   const score = q.score || {};
-  let h = `<p><b>Verdict:</b> <span class="badge ${q.verdict === "qualified" ? "b-ok" : "b-bad"}">${esc(q.verdict || "")}</span> ${esc(q.reason || "")}</p>`;
+  let h = `<p><b>Rubric verdict:</b> <span class="badge ${q.verdict === "qualified" ? "b-ok" : "b-bad"}">${esc(q.verdict || "")}</span> ${esc(q.reason || "")}</p>`;
   if (score.score_min !== undefined) h += `<p class="meta">Score ${esc(score.score_min)}${score.score_max !== score.score_min ? " to " + esc(score.score_max) : ""}${q.thresholds ? " | thresholds " + esc(JSON.stringify(q.thresholds)) : ""}</p>`;
   if (Array.isArray(score.gates) && score.gates.length)
     h += "<table><tr><th>Gate</th><th>Status</th><th>Basis</th></tr>" + score.gates.map(g => `<tr><td>${esc(g.label || g.id)}</td><td>${esc(g.status)}</td><td>${esc(g.basis)}${(g.evidence || []).map(e => quote(e.quote, e.source_url)).join("")}</td></tr>`).join("") + "</table>";
@@ -299,7 +330,9 @@ function renderSent() {
 function renderLog() {
   const parts = [];
   const sec = (t, h) => { if (h) parts.push(`<h3 style="margin:14px 0 4px;font-size:14px">${t}</h3>${h}`); };
-  if (results.qualify) sec("Why this company", renderQualify(results.qualify.result));
+  const ov = results.qualify && results.qualify.result && results.qualify.result.override;
+  const banner = ov ? `<p><span class="badge b-warn">MANUAL OVERRIDE</span> <b>qualified by manual override, not by the rubric.</b> ${esc(results.qualify.result.override_note || "")}</p>` : "";
+  if (results.qualify) sec("Why this company", banner + renderQualify(results.qualify.result));
   if (results.poc) sec("Why this person", renderContact(results.poc.result));
   if (results.draft) sec("Why this email", renderDraft(results.draft.result || {}));
   if (results.send) sec("The email", renderSent());

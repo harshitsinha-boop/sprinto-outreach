@@ -247,3 +247,35 @@ def test_missing_env_reports_names_503():
     status, out = post(app, {"stage": "scrape", "domain": "acme.com"})
     assert status == 503 and "GEMINI_API_KEY" in out["message"]
     assert post(app, {"stage": "scrape", "domain": "acme.com"}, pw="bad")[0] == 401
+
+
+def test_override_flag_passthrough_only_for_qualify_and_only_if_true():
+    calls = []
+
+    def spy(stage, state, *, settings, send=False, live_hunter=False, **kw):
+        calls.append((stage, kw))
+        return fake_run_stage(stage, state, settings=settings, send=send, **kw)
+
+    app = make_app(run_stage=spy, limiter=RateLimiter(99, 99))
+    for stage, flag in (("qualify", True), ("qualify", "true"), ("qualify", 1), ("draft", True), ("send", True)):
+        post(app, {"stage": stage, "domain": "gray.acme.com", "override_insufficient": flag})
+    assert calls[0] == ("qualify", {"override_insufficient": True})
+    assert calls[1] == ("qualify", {}) and calls[2] == ("qualify", {})
+    assert calls[3] == ("draft", {}) and calls[4] == ("send", {})
+
+
+def test_gray_band_override_end_to_end_with_fake():
+    app = make_app(limiter=RateLimiter(99, 99))
+    s, out = post(app, {"stage": "qualify", "domain": "gray.acme.com"})
+    assert out["status"] == "stopped" and out["stop_reason"] == "insufficient_data"
+    s, out = post(app, {"stage": "qualify", "domain": "gray.acme.com", "override_insufficient": True})
+    assert out["status"] == "ok" and out["result"]["override"] == "insufficient_data"
+    s, out = post(app, {"stage": "qualify", "domain": "stop.acme.com", "override_insufficient": True})
+    assert out["status"] == "stopped" and out["stop_reason"] == "disqualified"
+
+
+def test_ui_has_override_button_only_for_insufficient_data():
+    html = (ROOT / "web" / "index.html").read_text()
+    assert "Continue anyway (manual override, logged)" in html
+    assert 'stop_reason === "insufficient_data"' in html
+    assert "qualified by manual override, not by the rubric" in html
