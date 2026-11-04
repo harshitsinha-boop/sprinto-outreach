@@ -289,6 +289,31 @@ class HunterContact(BaseModel):
     source: Literal["live", "cache", "fixture"]
 
 
+class PocCandidate(BaseModel):
+    """One ranked Hunter person. `score` is deterministic; `eligible` False means excluded."""
+
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    position: str | None = None
+    category: str | None = None
+    score: float = 0.0
+    eligible: bool = True
+    notes: list[str] = Field(default_factory=list)
+
+
+class PocOutput(BaseModel):
+    """The chosen contact plus the deterministic reasoning that picked them."""
+
+    contact: HunterContact
+    band: Literal["small", "mid", "large"]
+    band_basis: str
+    reason: str
+    top_candidates: list[PocCandidate]
+    candidates_seen: int
+    risks: list[str] = Field(default_factory=list)
+
+
 class EmailDraft(BaseModel):
     subject: str
     body: str

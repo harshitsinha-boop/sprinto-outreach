@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -35,6 +36,11 @@ SEARCH_PARAMS = {
     "limit": 10,
 }
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "hunter_domain_search.json"
+
+
+# Per-process live-call counter by month. On Vercel the /tmp usage file is per instance and may be
+# reset on a cold start, so this in-memory count is a second, independent brake within an instance.
+_INSTANCE_LIVE_CALLS: dict[str, int] = {}
 
 
 class HunterError(Exception):
@@ -67,7 +73,11 @@ class HunterClient:
         *,
         http: httpx.Client | None = None,
         month: Callable[[], str] | None = None,
+        instance_counter: bool | None = None,
     ):
+        self._instance_counter = (
+            bool(os.environ.get("VERCEL")) if instance_counter is None else instance_counter
+        )
         self._key = api_key
         self.dir = Path(cache_dir)
         self.budget = budget
@@ -141,6 +151,11 @@ class HunterClient:
                 "check /v2/account before raising HUNTER_MONTHLY_BUDGET"
             )
 
+        if self._instance_counter and _INSTANCE_LIVE_CALLS.get(usage["month"], 0) >= self.budget:
+            raise HunterQuotaError(
+                f"per-instance Hunter budget {self.budget} reached for {usage['month']}"
+            )
+
         r = self._get("/domain-search", params={"domain": domain, **SEARCH_PARAMS})
         self._raise(r)  # 401/403/429/451/other errors are never cached
 
@@ -161,6 +176,7 @@ class HunterClient:
         usage["credits_used"] = float(usage.get("credits_used", 0.0)) + spent
         atomic_write_json(self.dir / "_usage.json", usage)
         self.live_calls_this_process += 1
+        _INSTANCE_LIVE_CALLS[usage["month"]] = _INSTANCE_LIVE_CALLS.get(usage["month"], 0) + 1
         return {**entry, "from_cache": False, "source": "live"}
 
 

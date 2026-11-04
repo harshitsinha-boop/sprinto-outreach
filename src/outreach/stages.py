@@ -23,6 +23,7 @@ from outreach.models import (
     EmailDraft,
     ExtractOutput,
     HunterContact,
+    PocOutput,
     PageResult,
     Qualification,
     ResearchOutcome,
@@ -30,6 +31,7 @@ from outreach.models import (
     ScrapeOutput,
     SendResult,
 )
+from outreach.poc import select_contact
 from outreach.pagegate import is_usable, page_gate
 from outreach.qualify import qualify
 from outreach.scrape import scrape_domain
@@ -165,15 +167,18 @@ def stage_qualify(ctx: Context, domain: str, prev: dict) -> Qualification:
     return q
 
 
-def stage_poc(ctx: Context, domain: str, prev: dict) -> HunterContact:
-    contact = pick_contact(ctx.hunter.domain_search(domain))
-    if contact is None:
-        raise StopStage("no_contact", "Hunter returned no person with a name and position")
-    return contact
+def stage_poc(ctx: Context, domain: str, prev: dict) -> PocOutput:
+    """One cache-first Hunter Domain Search (qualified companies only: the qualify stage stops
+    everything else before this runs), then deterministic ranking by company-size band."""
+    result = ctx.hunter.domain_search(domain)
+    poc = select_contact(result, prev["qualify"].profile)
+    if poc is None:
+        raise StopStage("no_contact", "Hunter returned no suitable named person for this company")
+    return poc
 
 
 def stage_draft(ctx: Context, domain: str, prev: dict) -> DraftOutput:
-    contact: HunterContact = prev["poc"]
+    contact: HunterContact = prev["poc"].contact
     draft = ctx.llm.generate_structured(
         model=ctx.settings.gemini_model_smart,
         system=DRAFT_SYSTEM,
@@ -194,7 +199,7 @@ def stage_send(ctx: Context, domain: str, prev: dict) -> SendResult:
         draft.subject,
         draft.body,
         dry_run=ctx.dry_run,
-        intended=prev["poc"],
+        intended=prev["poc"].contact,
         idempotency_key=f"outreach-{domain}-{digest}",
         sender=ctx.sender,
         out=ctx.out,
@@ -218,7 +223,7 @@ STAGE_MODELS: dict[str, type[BaseModel]] = {
     "scrape": ScrapeOutput,
     "extract": ExtractOutput,
     "qualify": Qualification,
-    "poc": HunterContact,
+    "poc": PocOutput,
     "draft": DraftOutput,
     "send": SendResult,
 }
