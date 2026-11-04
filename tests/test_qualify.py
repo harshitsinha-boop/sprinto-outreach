@@ -4,13 +4,16 @@ printed breakdown and the zero-Hunter guarantee. Everything is offline (conftest
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
 from conftest import (
     CANARY_ENV,
+    SAMPLE_PAGE_TEXT,
     FakeFetcher,
     FakeLLM,
     default_llm_responses,
@@ -33,9 +36,12 @@ from outreach.qualify import (
     final_verdict,
     initial_verdict,
     load_rubric,
+    qualification_from_record,
     qualify,
+    render_breakdown,
     score_profile,
 )
+from outreach.runner import render_summary, run_batch, write_summary
 from outreach.skeleton import run_one
 
 DOMAIN = CANARY_ENV["SKELETON_DOMAIN"]
@@ -389,3 +395,206 @@ def test_repo_rubric_thresholds_are_pinned():
     assert rubric.thresholds.qualify_min == 60
     assert rubric.thresholds.reject_max == 45
     assert sum(s.weight for s in rubric.signals) == 100
+
+
+# ---- Task 3: visible verdicts ----
+
+
+def case_qualification(case_id: str) -> Qualification:
+    case = next(c for c in CASES if c["id"] == case_id)
+    profile = CompanyProfile.model_validate(case["profile"])
+    return qualify(profile, pages_for(case["kinds_usable"]), load_rubric())
+
+
+def test_render_breakdown_lists_gates_signals_and_penalties():
+    q = case_qualification("reject_mature_certified")
+    text = render_breakdown(q)
+    lines = text.split("\n")
+
+    assert all(line.startswith("    ") for line in lines)
+    first = lines[0]
+    assert "disqualified" in first
+    assert q.reason in first
+    assert "score_min 6" in first and "score_max 16" in first
+    assert f"icp.1 sha256={q.rubric_sha256[:12]}" in first
+
+    assert any("G1_b2b" in ln and "pass" in ln for ln in lines)
+    assert any("G3_size_ceiling" in ln and "pass" in ln for ln in lines)
+    for signal_id in (
+        "b2b_software",
+        "funding_stage",
+        "headcount_band",
+        "compliance_pursuit",
+        "enterprise_customers",
+        "security_hiring",
+        "recent_funding",
+        "regulated_vertical",
+    ):
+        assert any(f"signal {signal_id} " in ln for ln in lines), signal_id
+    assert any("compliance_pursuit" in ln and "+6" in ln and "known" in ln for ln in lines)
+    assert any("recent_funding" in ln and "+0..10" in ln and "unknown" in ln for ln in lines)
+    assert any("penalty P1_mature_soc2_type2_and_iso27001" in ln and "-30" in ln for ln in lines)
+    assert any('"We hold a SOC 2 Type II report" (https://reject_mature_certified.example/)' in ln for ln in lines)
+
+
+def test_render_breakdown_strips_control_characters():
+    q = case_qualification("fit_series_b_full_signals")
+    nasty = "bad \x1b[31mred\x1b[0m\rtext\x7f\nnext"
+    compliance = q.score.signals[3].model_copy(
+        update={
+            "basis": nasty,
+            "evidence": [q.score.signals[3].evidence[0].model_copy(update={"quote": nasty})],
+        }
+    )
+    signals = list(q.score.signals)
+    signals[3] = compliance
+    hostile = q.model_copy(
+        update={
+            "reason": nasty,
+            "score": q.score.model_copy(update={"signals": signals}),
+        }
+    )
+
+    text = render_breakdown(hostile)
+
+    for bad in ("\x1b", "\r", "\x7f", "\t"):
+        assert bad not in text
+    assert text.count("\n") == len(text.split("\n")) - 1
+    assert "red" in text and "[31m" in text  # the visible remainder is kept, only controls go
+    assert all(line.startswith("    ") for line in text.split("\n"))
+
+
+def test_qualification_from_record_handles_ok_stopped_and_absent(ctx):
+    ok = run_one(DOMAIN, ctx)
+    from_ok = qualification_from_record(ok)
+    assert from_ok is not None and from_ok.verdict == "qualified"
+
+    ctx.fetcher = FakeFetcher(CONSUMER_TEXT)
+    responses = default_llm_responses()
+    responses["extract"] = consumer_profile()
+    ctx.llm = FakeLLM(responses)
+    stopped = run_one("stopped.example", ctx)
+    from_stopped = qualification_from_record(stopped)
+    assert from_stopped is not None and from_stopped.verdict == "disqualified"
+    # it also survives the trip through run.json
+    assert qualification_from_record(ctx.store.load("stopped.example")) == from_stopped
+
+    ctx.fetcher = FakeFetcher("too short to be a real page")
+    early = run_one("early.example", ctx)
+    assert early.stop_reason == "insufficient_data"
+    assert qualification_from_record(early) is None
+
+
+THIN_QUOTE = "Flowdesk is a workflow tool that agencies use to run client projects"
+THIN_TEXT = (
+    THIN_QUOTE
+    + ". Teams plan work, share files and keep every client request in one place. "
+    "Our team of about 30 people builds the product, and we raised a seed round to grow. "
+    "Agencies pick Flowdesk because it keeps projects, tasks and approvals together. "
+    "Start a trial, invite your team and move your first project in under an hour. "
+    "Templates cover onboarding, retainers, campaigns and reporting for agency work."
+)
+THIN_QUOTE_B2B = "Agencies pick Flowdesk because it keeps projects"
+THIN_QUOTE_STAGE = "we raised a seed round to grow"
+THIN_QUOTE_SIZE = "Our team of about 30 people"
+
+
+def thin_profile(url: str) -> CompanyProfile:
+    return CompanyProfile(
+        name=EvidencedText(value="Flowdesk", quote="Flowdesk is a workflow tool", source_url=url),
+        offering=EvidencedText(
+            value="workflow tool for agencies", quote=THIN_QUOTE, source_url=url
+        ),
+        is_b2b=EvidencedBool(value=True, quote=THIN_QUOTE_B2B, source_url=url),
+        stage=StageFact(value="seed", as_of=None, quote=THIN_QUOTE_STAGE, source_url=url),
+        headcount=HeadcountFact(value="11-50", quote=THIN_QUOTE_SIZE, source_url=url),
+        compliance_mentions=[],
+        hiring_signals=[],
+        enterprise_customers=[],
+    )
+
+
+class RoutingFetcher:
+    """Serves a different page per site; every URL of a site (subdomains included) gets that
+    site's text, so only the homepage stays usable (the duplicates are demoted)."""
+
+    def __init__(self, texts: dict[str, str]):
+        self.texts = texts
+        self.calls: list[str] = []
+
+    def fetch(self, url, site=None):
+        self.calls.append(url)
+        host = urlparse(url).hostname or ""
+        text = SAMPLE_PAGE_TEXT
+        for domain, candidate in self.texts.items():
+            if host == domain or host.endswith("." + domain):
+                text = candidate
+        return PageResult(url=url, status="ok", text=text, chars=len(text))
+
+
+class RoutedLLM(FakeLLM):
+    """Answers the extract call with the profile that belongs to the page text it was given."""
+
+    def __init__(self):
+        super().__init__(on_call=self._route)
+
+    def _route(self, purpose, call):
+        if purpose != "extract":
+            return
+        if "Pocket Pals" in call["prompt"]:
+            self.responses["extract"] = _with_url(consumer_profile(), "https://consumer.example/")
+        elif "Flowdesk" in call["prompt"]:
+            self.responses["extract"] = thin_profile("https://thin.example/")
+        else:
+            self.responses["extract"] = default_llm_responses()["extract"]
+
+
+def _with_url(profile: CompanyProfile, url: str) -> CompanyProfile:
+    return CompanyProfile.model_validate_json(
+        profile.model_dump_json().replace(CONSUMER_URL, url)
+    )
+
+
+def batch_ctx(ctx):
+    ctx.fetcher = RoutingFetcher({"consumer.example": CONSUMER_TEXT, "thin.example": THIN_TEXT})
+    ctx.llm = RoutedLLM()
+    return ctx
+
+
+def test_batch_prints_breakdowns_and_spends_hunter_only_on_qualified(ctx, fake_hunter):
+    batch_ctx(ctx)
+    progress = io.StringIO()
+
+    summary = run_batch(
+        ["consumer.example", "thin.example", "good.example"], ctx, progress=progress
+    )
+
+    assert [r.outcome for r in summary.rows] == ["disqualified", "insufficient_data", "qualified"]
+    assert fake_hunter.calls == ["good.example"]
+    thin_row = summary.rows[1]
+    assert "compliance_pursuit" in thin_row.detail and "unknown" in thin_row.detail
+
+    text = progress.getvalue()
+    first = text.index("[1/3] consumer.example -> disqualified")
+    second = text.index("[2/3] thin.example -> insufficient_data")
+    third = text.index("[3/3] good.example -> qualified")
+    assert first < text.index("gate G1_b2b fail") < second
+    assert second < text.index("insufficient_data: score 25..90") < third
+    assert third < text.rindex("qualified: score_min 80")
+    assert text.endswith("\n")
+
+
+def test_summary_carries_rubric_identity(ctx, tmp_path):
+    batch_ctx(ctx)
+    summary = run_batch(["good.example"], ctx)
+    sha = hashlib.sha256(DEFAULT_RUBRIC_PATH.read_bytes()).hexdigest()
+
+    assert summary.rubric == {"version": "icp.1", "sha256": sha, "file": "icp.toml"}
+    lines = render_summary(summary).split("\n")
+    assert lines[0] == "SUMMARY mode=dry_run hunter=fixture"
+    assert lines[1] == f"rubric icp.1 sha256={sha[:12]}"
+
+    path = write_summary(summary, tmp_path / "out")
+    on_disk = json.loads(path.read_text())
+    assert on_disk["rubric"]["version"] == "icp.1"
+    assert on_disk["rubric"]["sha256"] == sha

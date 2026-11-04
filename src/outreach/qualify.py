@@ -30,6 +30,7 @@ from outreach.models import (
     PenaltyHit,
     Qualification,
     RubricScore,
+    RunRecord,
     SignalScore,
 )
 from outreach.pagegate import is_usable
@@ -452,3 +453,59 @@ def qualify(
         kinds_usable=sorted(kinds),
         profile=profile,
     )
+
+
+# ---- display ----
+
+_INDENT = "    "
+
+
+def _printable(text: str) -> str:
+    """Page-derived text is printed to a terminal: drop control characters (ESC, CR, newline,
+    tab, DEL) so a quote can neither move the cursor nor start an escape sequence."""
+    return "".join(ch for ch in text if ch >= " " and ch != "\x7f")
+
+
+def _evidence_lines(evidence: list[Evidence]) -> list[str]:
+    return [
+        f'{_INDENT}{_INDENT}"{_printable(e.quote)}" ({_printable(e.source_url)})' for e in evidence
+    ]
+
+
+def render_breakdown(q: Qualification) -> str:
+    """The full defence of a verdict: every gate, signal (points, status, basis, evidence) and
+    applied penalty. Each line is indented four spaces so it sits under the progress line."""
+    lines = [
+        f"{_INDENT}{q.verdict}: {_printable(q.reason)} | score_min {q.score.score_min}, "
+        f"score_max {q.score.score_max} | rubric {q.rubric_version} sha256={q.rubric_sha256[:12]}"
+    ]
+    for gate in q.score.gates:
+        lines.append(f"{_INDENT}gate {gate.id} {gate.status}: {_printable(gate.basis)}")
+        lines.extend(_evidence_lines(gate.evidence))
+    for sig in q.score.signals:
+        pts = f"+{sig.points_min}" if sig.status == "known" else f"+0..{sig.weight}"
+        lines.append(
+            f"{_INDENT}signal {sig.id} (weight {sig.weight}) {pts} {sig.status} - "
+            f"{_printable(sig.basis)}"
+        )
+        lines.extend(_evidence_lines(sig.evidence))
+    for hit in q.score.penalties:
+        lines.append(f"{_INDENT}penalty {hit.id} -{hit.points}")
+        lines.extend(_evidence_lines(hit.evidence))
+    return "\n".join(lines)
+
+
+def qualification_from_record(rec: RunRecord) -> Qualification | None:
+    """The stored verdict of a run: from an ok qualify stage, or from `result` inside a stopped
+    one. None when the run never reached (or never finished) the qualify stage."""
+    stage = next((s for s in rec.stages if s.name == "qualify"), None)
+    if stage is None or stage.output is None:
+        return None
+    data = stage.output
+    if stage.status == "stopped":
+        data = data.get("result")
+    elif stage.status != "ok":
+        return None
+    if not data:
+        return None
+    return Qualification.model_validate(data)

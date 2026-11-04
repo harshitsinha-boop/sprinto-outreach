@@ -17,6 +17,7 @@ from outreach.config import redact
 from outreach.hunter import HunterAuthError, HunterQuotaError
 from outreach.llm import LLMAuthError, LLMQuotaError
 from outreach.models import OUTCOMES, BatchRow, BatchSummary, RunRecord
+from outreach.qualify import qualification_from_record, render_breakdown
 from outreach.send import SendError
 from outreach.skeleton import Context, run_one
 
@@ -123,6 +124,11 @@ def run_batch(
         mode="dry_run" if ctx.dry_run else "send",
         hunter=hunter_label,
         started_at=now_iso(),
+        rubric={
+            "version": ctx.rubric.rubric.version,
+            "sha256": ctx.rubric.sha256,
+            "file": ctx.rubric.path.name,
+        },
     )
     total = len(entries)
     for i, entry in enumerate(entries, start=1):
@@ -146,6 +152,7 @@ def run_batch(
             if systemic is not None:
                 summary.rows.append(row)
                 _progress(progress, i, total, row)
+                _breakdown(progress, ctx, domain)
                 summary.aborted = True
                 summary.abort_reason = redact(
                     f"systemic failure {type(systemic).__name__} on {domain}: {systemic}",
@@ -155,6 +162,8 @@ def run_batch(
                 break
         summary.rows.append(row)
         _progress(progress, i, total, row)
+        if not isinstance(entry, BatchRow):
+            _breakdown(progress, ctx, entry)
     _finish(summary)
     return summary
 
@@ -190,6 +199,17 @@ def _progress(progress: TextIO | None, i: int, total: int, row: BatchRow) -> Non
         progress.flush()
 
 
+def _breakdown(progress: TextIO | None, ctx: Context, domain: str) -> None:
+    """Under a domain's progress line: the stored verdict with its full rubric breakdown."""
+    if progress is None:
+        return
+    rec = ctx.store.load(domain)
+    q = qualification_from_record(rec) if rec is not None else None
+    if q is not None:
+        progress.write(render_breakdown(q) + "\n")
+        progress.flush()
+
+
 def _finish(summary: BatchSummary) -> None:
     summary.counts = {o: 0 for o in OUTCOMES}
     for row in summary.rows:
@@ -205,7 +225,10 @@ def render_summary(summary: BatchSummary) -> str:
     def fmt(cells: tuple[str, str, str]) -> str:
         return "  ".join(cell.ljust(widths[c]) for c, cell in enumerate(cells)).rstrip()
 
-    lines = [f"SUMMARY mode={summary.mode} hunter={summary.hunter}", fmt(header)]
+    lines = [f"SUMMARY mode={summary.mode} hunter={summary.hunter}"]
+    if summary.rubric:
+        lines.append(f"rubric {summary.rubric['version']} sha256={summary.rubric['sha256'][:12]}")
+    lines.append(fmt(header))
     lines.extend(fmt(row) for row in body)
     lines.append("outcomes: " + " ".join(f"{o}={summary.counts.get(o, 0)}" for o in OUTCOMES))
     if summary.aborted:
