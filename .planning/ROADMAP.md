@@ -89,14 +89,14 @@ Plans:
   3. Each company shows a minimum score (unknowns as 0) and a maximum score (unknowns at full weight), and is qualified, rejected, or sent to the agent loop on that basis.
   4. For an insufficient-data company the agent loop fetches at most 3 extra pages, same-domain only, each with a logged reason, and always ends with a stop-reason value; an off-domain URL it is steered toward is refused.
   5. A disqualified or insufficient-data company shows its full score breakdown in the output and makes zero Hunter calls.
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 
 Plans:
 **Wave 1**
 - [x] 03-01-PLAN.md — Tracer: hashed rubric data file (config/icp.toml), deterministic min/max scorer with a calibration set, qualify stage stopping disqualified and insufficient-data companies before Hunter with the full breakdown shown (QUA-01, QUA-02, QUA-03, QUA-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 03-02-PLAN.md — Bounded research loop: hand-written Gemini function calling (AFC off, role user, cached), at most 3 same-domain candidate fetches each with a logged reason, stop_reason enum, re-extraction and Python re-scoring (QUA-04, QUA-05)
+- [x] 03-02-PLAN.md — Bounded research loop: hand-written Gemini function calling (AFC off, role user, cached), at most 3 same-domain candidate fetches each with a logged reason, stop_reason enum, re-extraction and Python re-scoring (QUA-04, QUA-05)
 
 ### Phase 4: PoC Selection
 **Goal:** Each qualified company gets exactly one named, defensible decision-maker from Hunter within the free-tier budget, and every other company costs no Hunter credit.
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Foundation and Walking Skeleton | 4/4 | Complete    | 2026-11-03 |
 | 2. Runner, CLI and Real Scrape/Extract | 3/3 | Complete    | 2026-11-03 |
-| 3. ICP Rubric and Bounded Agent Loop | 1/2 | In Progress | - |
+| 3. ICP Rubric and Bounded Agent Loop | 2/2 | In Progress | - |
 | 4. PoC Selection | 0/TBD | Not started | - |
 | 5. Pain Points, Draft and Validator | 0/TBD | Not started | - |
 | 6. Send, Decision Log and Demo Hardening | 0/TBD | Not started | - |

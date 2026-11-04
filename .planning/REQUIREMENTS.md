@@ -32,8 +32,8 @@
 - [x] **QUA-01**: A written ICP rubric (hard gates, weighted signals, penalties, threshold) is stored as data and its hash is logged with every run
 - [x] **QUA-02**: The LLM extracts facts and Python computes the score, so the same evidence always gives the same score
 - [x] **QUA-03**: The score is computed as a minimum (unknowns as 0) and maximum (unknowns at full weight), qualifying, rejecting or triggering the agent loop accordingly
-- [ ] **QUA-04**: When data is insufficient, an agent loop fetches more pages for at most 3 iterations, from same-domain URLs only, with a logged reason per fetch and a stop-reason enum
-- [ ] **QUA-05**: A disqualified or insufficient-data company shows its score breakdown and costs no Hunter credit
+- [x] **QUA-04**: When data is insufficient, an agent loop fetches more pages for at most 3 iterations, from same-domain URLs only, with a logged reason per fetch and a stop-reason enum
+- [x] **QUA-05**: A disqualified or insufficient-data company shows its score breakdown and costs no Hunter credit
 
 ### Point of Contact
 
@@ -117,8 +117,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUA-01 | Phase 3 | Complete |
 | QUA-02 | Phase 3 | Complete |
 | QUA-03 | Phase 3 | Complete |
-| QUA-04 | Phase 3 | Pending |
-| QUA-05 | Phase 3 | Pending |
+| QUA-04 | Phase 3 | Complete |
+| QUA-05 | Phase 3 | Complete |
 | POC-01 | Phase 4 | Pending |
 | POC-02 | Phase 4 | Pending |
 | POC-03 | Phase 4 | Pending |
