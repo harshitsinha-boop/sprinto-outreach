@@ -319,9 +319,64 @@ class EmailDraft(BaseModel):
     body: str
 
 
+class EvidenceItem(BaseModel):
+    """One citable fact from the validated CompanyProfile, with a stable id (E1, E2, ...)."""
+
+    id: str
+    kind: str
+    fact: str
+    quote: str
+    source_url: str
+
+
+class PainPoint(BaseModel):
+    pain: str
+    role_link: str
+    evidence_id: str
+
+
+class PainPointSet(BaseModel):
+    pain_points: list[PainPoint]
+
+
+class ClaimUsed(BaseModel):
+    """A statement in the email and the id it rests on: an evidence id (E1..) or a whitelisted
+    Sprinto claim id (S1, S2)."""
+
+    claim: str
+    evidence_id: str
+
+
+class DraftLLM(BaseModel):
+    subject: str
+    body: str
+    claims_used: list[ClaimUsed]
+
+
+class HookLink(BaseModel):
+    claim: str
+    evidence_id: str
+    quote: str
+    source_url: str
+
+
+class DraftValidation(BaseModel):
+    ok: bool
+    failures: list[str] = Field(default_factory=list)
+    attempts: int = 1
+    attempt_failures: list[list[str]] = Field(default_factory=list)
+
+
 class DraftOutput(BaseModel):
-    draft: EmailDraft
+    draft: EmailDraft  # subject and the final body, compliance footer included
     greets_by_first_name: bool
+    core_body: str = ""  # the validated 50-90 word body, before the footer
+    claims_used: list[ClaimUsed] = Field(default_factory=list)
+    pain_points: list[PainPoint] = Field(default_factory=list)
+    pain_points_source: str = ""
+    hook_map: list[HookLink] = Field(default_factory=list)
+    evidence_pack: list[EvidenceItem] = Field(default_factory=list)
+    validation: DraftValidation | None = None
 
 
 class SendResult(BaseModel):

@@ -21,7 +21,10 @@ from outreach.config import load_settings
 from outreach.models import (
     CompanyProfile,
     ComplianceMention,
-    EmailDraft,
+    ClaimUsed,
+    DraftLLM,
+    PainPoint,
+    PainPointSet,
     EnterpriseCustomer,
     EvidencedBool,
     EvidencedText,
@@ -31,6 +34,7 @@ from outreach.models import (
     StageFact,
     ToolReply,
 )
+from outreach.draft import SPRINTO_WHITELIST
 from outreach.skeleton import Context
 
 CANARY_ENV = {
@@ -84,6 +88,15 @@ PLANTED_LINES = [
 INJECTED_PAGE_TEXT = SAMPLE_PAGE_TEXT + "\n" + "\n".join(PLANTED_LINES)
 
 
+GOOD_BODY = (
+    "Hi Richard, I saw you are working toward SOC 2 Type II and are hiring a Security "
+    "Engineer to own the program. Teams in that spot often lose weeks of focus to evidence "
+    "collection and security reviews while enterprise deals wait. Sprinto automates compliance "
+    "for SOC 2, ISO 27001 and GDPR, with continuous monitoring and audit-ready evidence "
+    "collection. Would a short walkthrough be useful?"
+)
+
+
 def default_llm_responses() -> dict:
     return {
         "extract": CompanyProfile(
@@ -111,14 +124,28 @@ def default_llm_responses() -> dict:
                 for name in ("Northwind Logistics", "Contoso Freight", "Globex Manufacturing")
             ],
         ),
-        "draft": EmailDraft(
-            subject="Your SOC 2 Type II timeline",
-            body=(
-                "Hi Richard, I saw Acme Ledger is working toward SOC 2 Type II and is hiring "
-                "a Security Engineer to own the program. Teams in that spot often lose weeks "
-                "to evidence collection. Would a short note on how others shortened that "
-                "stretch be useful?"
-            ),
+        "pain_points": PainPointSet(
+            pain_points=[
+                PainPoint(
+                    pain="Enterprise security reviews can slow deals while SOC 2 is in progress.",
+                    role_link="a CEO owns deal speed",
+                    evidence_id="E1",
+                ),
+                PainPoint(
+                    pain="A new security hire inherits evidence collection for the whole program.",
+                    role_link="a CEO owns hiring and focus",
+                    evidence_id="E2",
+                ),
+            ]
+        ),
+        "draft": DraftLLM(
+            subject="your soc 2 timeline",
+            body=GOOD_BODY,
+            claims_used=[
+                ClaimUsed(claim="working toward SOC 2 Type II", evidence_id="E1"),
+                ClaimUsed(claim="hiring a Security Engineer", evidence_id="E2"),
+                ClaimUsed(claim=SPRINTO_WHITELIST["S1"], evidence_id="S1"),
+            ],
         ),
     }
 

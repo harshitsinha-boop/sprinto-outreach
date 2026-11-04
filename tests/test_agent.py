@@ -153,7 +153,7 @@ def test_gray_band_company_researches_one_page_and_qualifies(ctx):
     assert step["reason"]
     assert {"compliance_pursuit", "security_hiring"} <= set(step["resolved_signals"])
     assert (step["score_min"], step["score_max"]) == (70, 70 + 15 + 10)  # customers and recent_funding unknown
-    assert [c["purpose"] for c in llm.calls] == ["extract", "research_extract", "draft"]
+    assert [c["purpose"] for c in llm.calls] == ["extract", "research_extract", "pain_points", "draft"]
     assert [t["kind"] for t in llm.tool_turns] == ["send"]
     assert hunter.calls == ["example.com"]
 
@@ -604,6 +604,7 @@ def test_rerun_of_loop_company_makes_no_new_gemini_calls(ctx, fake_sleep, tmp_pa
             "fetch_page", {"url": TRUST_URL, "reason": "resolve compliance_pursuit"}
         ),
         text_response(trust_profile().model_dump_json()),
+        text_response(default_llm_responses()["pain_points"].model_dump_json()),
         text_response(default_llm_responses()["draft"].model_dump_json()),
     ]
     first = LLMClient(key, cache, client=FakeGenaiClient(queue), sleep=fake_sleep)
@@ -613,12 +614,12 @@ def test_rerun_of_loop_company_makes_no_new_gemini_calls(ctx, fake_sleep, tmp_pa
     rec = run_one("example.com", ctx)
     assert rec.status == "dry_run"
     assert stage_output(rec, "qualify")["research"]["stop_reason"] == "sufficient_data"
-    assert first.stats.api_calls == 4 and first._c.models.queue == []
+    assert first.stats.api_calls == 5 and first._c.models.queue == []
 
     second = LLMClient(key, cache, client=FakeGenaiClient([]), sleep=fake_sleep)
     ctx.llm = second
     rerun = run_one("example.com", ctx)
     assert rerun.status == "dry_run"
     assert second._c.models.calls == [] and second.stats.api_calls == 0
-    assert second.stats.cache_hits == 4  # extract, the tool turn, research_extract and draft
+    assert second.stats.cache_hits == 5  # extract, the tool turn, research_extract, pain points and draft
     assert rerun.counters["llm_api_calls"] == 0

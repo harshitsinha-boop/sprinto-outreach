@@ -53,7 +53,7 @@ def test_one_domain_runs_six_stages_to_dry_run(ctx, capsys):
         "fast": ctx.settings.gemini_model_fast,
         "smart": ctx.settings.gemini_model_smart,
     }
-    assert on_disk["counters"]["llm_api_calls"] == 2
+    assert on_disk["counters"]["llm_api_calls"] == 3
 
 
 def test_dry_run_prints_exact_payload_and_never_calls_sender(ctx, fake_sender, capsys):
@@ -194,13 +194,14 @@ def test_rerun_makes_zero_gemini_and_hunter_calls(settings):
     responses = default_llm_responses()
     queue = [
         text_response(responses["extract"].model_dump_json()),
+        text_response(responses["pain_points"].model_dump_json()),
         text_response(responses["draft"].model_dump_json()),
     ]
     pages1, hunter1 = [], []
     ctx1 = _real_ctx(settings, queue, SAMPLE_HTML, pages1, hunter1)
     rec1 = run_one(DOMAIN, ctx1)
     assert rec1.status == "dry_run"
-    assert ctx1.llm.stats.api_calls == 2
+    assert ctx1.llm.stats.api_calls == 3
     assert ctx1.hunter.live_calls_this_process == 1
     assert len(pages1) >= 2 and len(hunter1) == 1
 
@@ -212,7 +213,7 @@ def test_rerun_makes_zero_gemini_and_hunter_calls(settings):
     rec2 = run_one(DOMAIN, ctx2)
     assert rec2.status == "dry_run"
     assert ctx2.llm.stats.api_calls == 0
-    assert ctx2.llm.stats.cache_hits == 2
+    assert ctx2.llm.stats.cache_hits == 3
     assert ctx2.hunter.live_calls_this_process == 0
     assert pages2 == [] and hunter2 == []
     assert ctx2.llm._c.models.calls == []
@@ -244,7 +245,7 @@ def test_skeleton_cli_prints_payload_and_exits_zero(ctx, settings, fake_sender, 
     assert "DRY RUN - Resend NOT called" in result.output
     last = result.output.strip().splitlines()[-1]
     assert last.startswith("status=dry_run run_record=")
-    assert last.endswith("llm_api_calls=2 llm_cache_hits=0 hunter_live_calls=0")
+    assert last.endswith("llm_api_calls=3 llm_cache_hits=0 hunter_live_calls=0")
     assert fake_sender.calls == []
 
 
