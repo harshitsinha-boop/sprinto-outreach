@@ -57,9 +57,14 @@
 <body>
 <main>
   <h1>Sprinto outreach runner</h1>
-  <p class="sub">Enter a company domain. The pipeline scrapes, extracts, qualifies, finds a contact and drafts an email. Mail only ever goes to the owner's own address.</p>
+  <p class="sub">Free to use, no sign-in. Enter a company domain and the pipeline scrapes, extracts, qualifies, finds a contact and drafts an email. Any email is sent only to the site owner's own address, never to the company.</p>
 
-  <section class="card" id="login">
+  <section class="card hidden" id="notConfigured" role="status">
+    <h2>Not configured yet</h2>
+    <p class="meta" style="margin:0">This runner is not set up on the server yet. Please check back soon.</p>
+  </section>
+
+  <section class="card hidden" id="login">
     <label for="pw">Password</label>
     <div class="row">
       <input id="pw" type="password" autocomplete="current-password" placeholder="Shared password">
@@ -107,7 +112,7 @@
 "use strict";
 const STAGES = ["scrape","extract","qualify","poc","draft","send"];
 const LABEL = {scrape:"Scrape pages", extract:"Extract facts", qualify:"Qualify company", poc:"Find contact", draft:"Draft email", send:"Send / preview"};
-const MAX_RUNS = 5;
+const MAX_RUNS = 3;
 const $ = id => document.getElementById(id);
 const store = window.sessionStorage;
 let busy = false, state = {}, results = {}, domain = "", owner = "";
@@ -125,24 +130,29 @@ async function api(path, body) {
   return { status: res.status, data };
 }
 
+function showForm() { $("login").classList.add("hidden"); $("runCard").classList.remove("hidden"); showRuns(); }
+
 async function unlock() {
   $("loginErr").textContent = "";
   const pw = $("pw").value;
   if (!pw) { $("loginErr").textContent = "Enter the password."; return; }
   store.setItem("pw", pw);
-  const { status, data } = await api("/api/health");
-  if (status === 200) {
-    $("pw").value = ""; $("login").classList.add("hidden"); $("runCard").classList.remove("hidden"); showRuns();
-    const miss = Object.entries(data.configured || {}).filter(([, v]) => !v).map(([k]) => k);
-    if (miss.length) $("runErr").textContent = "Server is missing environment variables: " + miss.join(", ");
-  } else {
-    store.removeItem("pw");
-    $("loginErr").textContent = status === 401 ? "Wrong password." : (data.message || "Error " + status);
-  }
+  // /api/health is public, so verify the password against an authenticated call
+  const { status, data } = await api("/api/run", { stage: "bogus", domain: "example.com" });
+  if (status === 401) { store.removeItem("pw"); $("loginErr").textContent = "Wrong password."; return; }
+  if (status === 429) { $("loginErr").textContent = data.message || "Too many requests."; return; }
+  $("pw").value = ""; showForm();
 }
 function lock() { store.clear(); location.reload(); }
-if (store.getItem("pw")) { $("login").classList.add("hidden"); $("runCard").classList.remove("hidden"); showRuns();
-  api("/api/health").then(r => { if (r.status !== 200) lock(); }); }
+
+(async function init() {
+  const { status, data } = await api("/api/health");
+  if (status !== 200) { $("runErr").textContent = data.message || "Could not reach the server."; showForm(); return; }
+  if (!data.configured) { $("notConfigured").classList.remove("hidden"); return; }
+  if (data.auth_required) {
+    if (store.getItem("pw")) showForm(); else $("login").classList.remove("hidden");
+  } else { $("lockBtn").classList.add("hidden"); showForm(); }
+})();
 
 function stageRow(name, status, detail) {
   let li = $("st-" + name);
@@ -168,12 +178,14 @@ async function runStage(name, extra) {
   if (status !== 200) {
     stageRow(name, "failed", `${data.error || "error"}: ${data.message || status}`);
     if (status === 401) setTimeout(lock, 1500);
+    if (status === 503) $("notConfigured").classList.remove("hidden");
     return { ok: false, data };
   }
   if (data.state) state = data.state;
   if (data.owner_email) owner = data.owner_email;
   results[name] = data;
   const li = stageRow(name, data.status || "ok", [data.stop_reason, data.detail].filter(Boolean).join(" - "));
+  if (data.send_note) $("sendErr").textContent = data.send_note;
   addRaw(li, data.result);
   return { ok: data.status === "ok", data };
 }
@@ -226,7 +238,7 @@ async function doSend(confirm) {
   const r = await runStage("send", { confirm_send: confirm });
   busy = false; $("previewBtn").disabled = false; $("sendBtn").disabled = !$("sendOk").checked;
   if (!r.ok) $("sendErr").textContent = (r.data && (r.data.message || r.data.detail)) || "Send failed.";
-  else if (confirm) { $("sendCard").classList.add("hidden"); }
+  else if (confirm && !(r.data && r.data.send_note)) { $("sendCard").classList.add("hidden"); }
   renderLog();
 }
 $("sendOk").addEventListener("change", () => { $("sendBtn").disabled = !$("sendOk").checked || busy; });

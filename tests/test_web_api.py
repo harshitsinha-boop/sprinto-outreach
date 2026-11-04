@@ -32,21 +32,65 @@ def post(app, body, pw=PW, ip="1.2.3.4"):
     return app.handle("POST", "/api/run", headers, json.dumps(body).encode(), ip)
 
 
-def test_auth_required():
+def test_password_enforced_when_set():
     app = make_app()
     assert post(app, {"stage": "scrape", "domain": "acme.com"}, pw=None)[0] == 401
     assert post(app, {"stage": "scrape", "domain": "acme.com"}, pw="wrong")[0] == 401
-    assert app.handle("GET", "/api/health", {}, b"", "1.1.1.1")[0] == 401
     assert post(app, {"stage": "scrape", "domain": "acme.com"})[0] == 200
 
 
-def test_refuses_everything_when_password_unset():
-    app = WebApp({}, run_stage=fake_run_stage, settings_factory=fake_settings)
+def test_open_mode_without_password():
+    app = make_app({"APP_PASSWORD": ""})
     for pw in (None, "", "anything"):
-        status, body = post(app, {"stage": "scrape", "domain": "acme.com"}, pw=pw)
-        assert status == 503 and body["error"] == "not_configured"
-        assert "APP_PASSWORD" in body["message"]
-    assert app.handle("GET", "/api/health", {"x-app-password": ""}, b"", "x")[0] == 503
+        assert post(app, {"stage": "scrape", "domain": "acme.com"}, pw=pw)[0] == 200
+
+
+def test_503_only_when_keys_missing_and_names_only_keys():
+    app = WebApp({}, run_stage=fake_run_stage)  # open mode, no keys
+    status, body = post(app, {"stage": "scrape", "domain": "acme.com"}, pw=None)
+    assert status == 503 and body["error"] == "not_configured"
+    assert "GEMINI_API_KEY" in body["message"] and "APP_PASSWORD" not in body["message"]
+    keys = {k: "canary-%s-xxxx" % k for k in
+            ("GEMINI_API_KEY", "HUNTER_API_KEY", "RESEND_API_KEY", "OWNER_EMAIL")}
+    app = WebApp(keys, run_stage=fake_run_stage)
+    assert app.configured() is True
+
+
+def test_health_is_public_and_leaks_nothing():
+    app = make_app()
+    status, out = app.handle("GET", "/api/health", {}, b"", "1")
+    assert status == 200 and set(out) == {"ok", "configured", "auth_required"}
+    assert out["auth_required"] is True and isinstance(out["configured"], bool)
+    blob = json.dumps(out)
+    assert CANARY not in blob and PW not in blob
+    status, out = WebApp({}).handle("GET", "/api/health", {}, b"", "1")
+    assert out == {"ok": True, "configured": False, "auth_required": False}
+
+
+def test_send_cap_falls_back_to_preview():
+    t = [1000.0]
+    app = make_app({"WEB_MAX_SENDS_PER_HOUR": "1"}, limiter=RateLimiter(99, 99), clock=lambda: t[0])
+    body = {"stage": "send", "domain": "acme.com", "confirm_send": True}
+    s1, o1 = post(app, body)
+    assert o1["live_send"] is True and o1["result"]["mode"] == "sent"
+    s2, o2 = post(app, body)
+    assert s2 == 200 and o2["live_send"] is False and o2["result"]["mode"] == "dry_run"
+    assert "limit" in o2["send_note"].lower()
+    t[0] += 3601
+    assert post(app, body)[1]["live_send"] is True
+
+
+def test_rate_limiter_prunes_idle_entries(monkeypatch):
+    import _logic
+
+    monkeypatch.setattr(_logic, "MAX_TRACKED_IPS", 50)
+    lim = RateLimiter(per_min=5, runs_per_hour=5)
+    for i in range(500):
+        lim.check(f"ip{i}", 1000.0 + i * 100, run_start=True)
+    assert len(lim._req) <= 51 and len(lim._runs) <= 51
+    for i in range(500):  # all active at the same instant: still bounded
+        lim.check(f"x{i}", 5000.0, run_start=True)
+    assert len(lim._req) <= 51 and len(lim._runs) <= 51
 
 
 @pytest.mark.parametrize(
@@ -163,13 +207,6 @@ def test_fake_stops_and_fails():
     assert out["status"] == "failed"
 
 
-def test_health_reports_names_only():
-    status, out = make_app().handle("GET", "/api/health", {"x-app-password": PW}, b"", "1")
-    assert status == 200 and out["configured"]["GEMINI_API_KEY"] is True
-    assert out["configured"]["HUNTER_API_KEY"] is False
-    assert CANARY not in json.dumps(out)
-
-
 def test_vercel_json_valid():
     cfg = json.loads((ROOT / "vercel.json").read_text())
     fn = cfg["functions"]["api/*.py"]
@@ -209,3 +246,4 @@ def test_missing_env_reports_names_503():
     app = WebApp({"APP_PASSWORD": PW}, run_stage=fake_run_stage)
     status, out = post(app, {"stage": "scrape", "domain": "acme.com"})
     assert status == 503 and "GEMINI_API_KEY" in out["message"]
+    assert post(app, {"stage": "scrape", "domain": "acme.com"}, pw="bad")[0] == 401

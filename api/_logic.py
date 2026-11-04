@@ -5,11 +5,12 @@ code and a JSON-able dict. The Vercel handler (api/run.py) and the local dev ser
 (scripts/serve_web.py) both delegate here, so tests exercise the exact production logic.
 
 Security properties:
-- every request needs the shared password in `x-app-password` (hmac.compare_digest);
-  an unset APP_PASSWORD refuses everything (never open by default).
+- APP_PASSWORD is optional: when set, every /api/run call needs it in `x-app-password`
+  (hmac.compare_digest); when unset the API is open. /api/health is public (booleans only).
+- 503 "not configured" only while the real keys / OWNER_EMAIL are missing.
 - the send stage ignores any recipient in the request; the pipeline mails OWNER_EMAIL only,
   and only when `confirm_send` is exactly boolean true (otherwise a dry-run preview).
-- per-IP rate limits and a per-instance Hunter live-search budget bound credit usage.
+- per-IP rate limits, a per-instance Hunter live-search budget and a live-send cap bound abuse.
 - responses never contain secret values (redact()) or stack traces.
 """
 
@@ -28,18 +29,20 @@ from pathlib import Path
 STAGES = ("scrape", "extract", "qualify", "poc", "draft", "send")
 MAX_BODY_BYTES = 4_000_000  # Vercel caps request bodies at 4.5 MB
 MAX_REQ_PER_MIN = 10
-MAX_RUNS_PER_HOUR = 30
+MAX_RUNS_PER_HOUR = 20
 DEFAULT_HUNTER_BUDGET = 10
-ENV_NAMES = ("APP_PASSWORD", "GEMINI_API_KEY", "HUNTER_API_KEY", "RESEND_API_KEY", "OWNER_EMAIL")
+DEFAULT_MAX_SENDS_PER_HOUR = 5
+REQUIRED_ENV = ("GEMINI_API_KEY", "HUNTER_API_KEY", "RESEND_API_KEY", "OWNER_EMAIL")
+MAX_TRACKED_IPS = 5000
 _LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 _BAD_TLDS = frozenset(
     {"local", "localhost", "internal", "lan", "home", "corp", "intranet", "test", "invalid", "arpa"}
 )
 
 NOT_CONFIGURED_MSG = (
-    "The web runner is not configured. Set these environment variables on the host: "
-    + ", ".join(ENV_NAMES)
-    + " (optional: WEB_HUNTER_BUDGET, GEMINI_MODEL_SMART, GEMINI_MODEL_FAST, RESEND_FROM)."
+    "The web runner is not configured yet. The host needs these environment variables: "
+    + ", ".join(REQUIRED_ENV)
+    + "."
 )
 
 
@@ -84,8 +87,19 @@ class RateLimiter:
         while q and now - q[0] >= window:
             q.popleft()
 
+    def _prune(self, now: float) -> None:
+        """Drop idle IPs so bookkeeping cannot grow without bound."""
+        if len(self._req) + len(self._runs) < MAX_TRACKED_IPS:
+            return
+        for table, window in ((self._req, 60), (self._runs, 3600)):
+            for key in [k for k, q in table.items() if not q or now - q[-1] >= window]:
+                del table[key]
+            while len(table) >= MAX_TRACKED_IPS:  # still full of active IPs: evict the oldest
+                del table[next(iter(table))]
+
     def check(self, ip: str, now: float, *, run_start: bool) -> str | None:
         with self._lock:
+            self._prune(now)
             req = self._req[ip]
             self._trim(req, now, 60)
             if len(req) >= self.per_min:
@@ -116,6 +130,7 @@ class WebApp:
         self._clock = clock
         self.limiter = limiter or RateLimiter()
         self._hunter_used = 0
+        self._sends: deque = deque()
         self._lock = threading.Lock()
 
     # -- helpers ---------------------------------------------------------------------------
@@ -131,6 +146,27 @@ class WebApp:
                 return False
             self._hunter_used += 1
             return True
+
+    def _max_sends(self) -> int:
+        try:
+            return max(0, int(self._env.get("WEB_MAX_SENDS_PER_HOUR", DEFAULT_MAX_SENDS_PER_HOUR)))
+        except (TypeError, ValueError):
+            return DEFAULT_MAX_SENDS_PER_HOUR
+
+    def _take_send(self) -> bool:
+        now = self._clock()
+        with self._lock:
+            while self._sends and now - self._sends[0] >= 3600:
+                self._sends.popleft()
+            if len(self._sends) >= self._max_sends():
+                return False
+            self._sends.append(now)
+            return True
+
+    def configured(self) -> bool:
+        if self._run_stage is not None and self._settings_factory is not None:
+            return True  # injected pipeline (tests, --fake)
+        return all(bool((self._env.get(n) or "").strip()) for n in REQUIRED_ENV)
 
     def hunter_remaining(self) -> int:
         return max(0, self._hunter_budget() - self._hunter_used)
@@ -199,24 +235,21 @@ class WebApp:
     def _handle(self, method, path, headers, body, client_ip):
         h = {k.lower(): v for k, v in headers.items()}
         expected = self._env.get("APP_PASSWORD") or ""
-        if not expected:
-            return 503, {"error": "not_configured", "message": NOT_CONFIGURED_MSG}
+        route = path.split("?", 1)[0].rstrip("/")
+        if route == "/api/health" and method == "GET":  # public, booleans only
+            return 200, {"ok": True, "configured": self.configured(), "auth_required": bool(expected)}
         wait = self.limiter.check(
             client_ip, self._clock(), run_start=False
         )
         if wait:
             return 429, {"error": "rate_limited", "message": wait}
-        supplied = h.get("x-app-password", "")
-        if not hmac.compare_digest(supplied.encode(), expected.encode()):
-            return 401, {"error": "unauthorized", "message": "wrong or missing password"}
+        if expected:  # optional shared password: enforced whenever it is set
+            supplied = h.get("x-app-password", "")
+            if not hmac.compare_digest(supplied.encode(), expected.encode()):
+                return 401, {"error": "unauthorized", "message": "wrong or missing password"}
+        if not self.configured():
+            return 503, {"error": "not_configured", "message": NOT_CONFIGURED_MSG}
 
-        route = path.split("?", 1)[0].rstrip("/")
-        if route == "/api/health" and method == "GET":
-            return 200, {
-                "ok": True,
-                "configured": {n: bool(self._env.get(n)) for n in ENV_NAMES},
-                "hunter_budget_remaining": self.hunter_remaining(),
-            }
         if route == "/api/run" and method == "POST":
             return self._run(body, client_ip)
         raise RequestError(404 if route.startswith("/api") else 400, "not_found", "unknown route")
@@ -246,6 +279,13 @@ class WebApp:
         stage_fn = self._stage_fn()
         settings = self._settings()
         send = stage == "send" and req.get("confirm_send") is True
+        send_note = None
+        if send and not self._take_send():
+            send = False
+            send_note = (
+                "Send limit reached for now (WEB_MAX_SENDS_PER_HOUR); "
+                "showing the dry-run preview instead. Nothing was sent."
+            )
         live_hunter = stage == "poc" and self._take_hunter()
         state = {**state, "domain": domain}  # the validated domain always wins
         result = stage_fn(stage, state, settings=settings, send=send, live_hunter=live_hunter)
@@ -254,6 +294,8 @@ class WebApp:
         out = dict(result)
         out.setdefault("stage", stage)
         out["live_send"] = send
+        if send_note:
+            out["send_note"] = send_note
+            out["detail"] = send_note
         out["owner_email"] = getattr(settings, "owner_email", "")
-        out["hunter_budget_remaining"] = self.hunter_remaining()
         return 200, self._redact(out, settings)

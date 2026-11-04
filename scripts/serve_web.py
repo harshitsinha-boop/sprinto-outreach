@@ -1,6 +1,6 @@
 """Local dev server: serves web/index.html and routes /api/* to the production handler logic.
 
-    APP_PASSWORD=pw .venv/bin/python scripts/serve_web.py --fake      # no keys, fake pipeline
+    .venv/bin/python scripts/serve_web.py --fake      # no keys, fake pipeline
     .venv/bin/python scripts/serve_web.py                             # real pipeline, keys from env
 
 Binds to 127.0.0.1 only.
@@ -69,10 +69,8 @@ def main() -> None:
     if args.fake:
         from _fake import fake_run_stage, fake_settings
 
-        env = dict(os.environ)
-        env.setdefault("APP_PASSWORD", "dev")
-        app = WebApp(env, run_stage=fake_run_stage, settings_factory=fake_settings)
-        print("FAKE mode. Password: " + ("from APP_PASSWORD" if os.environ.get("APP_PASSWORD") else "dev"))
+        app = WebApp(dict(os.environ), run_stage=fake_run_stage, settings_factory=fake_settings)
+        print("FAKE mode. " + ("Password from APP_PASSWORD." if os.environ.get("APP_PASSWORD") else "Open (no password)."))
     else:
         app = WebApp()
     print(f"http://127.0.0.1:{args.port}/")
