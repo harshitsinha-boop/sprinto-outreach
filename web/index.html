@@ -257,6 +257,8 @@ function renderContact(r) {
   const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || c.name || "";
   let h = `<p><b>${esc(name)}</b>${c.position ? ", " + esc(c.position) : ""}${c.email ? " &lt;" + esc(c.email) + "&gt;" : ""}${c.confidence != null ? ` <span class="meta">confidence ${esc(c.confidence)}</span>` : ""}${c.source ? ` <span class="badge">${esc(c.source)}</span>` : ""}</p>`;
   const why = r.why || r.reason || r.rationale; if (why) h += `<p>${esc(why)}</p>`;
+  if (r.band_basis) h += `<p class="meta">${esc(r.band_basis)}</p>`;
+  if (Array.isArray(r.risks) && r.risks.length) h += `<p class="meta">Risks: ${r.risks.map(esc).join("; ")}</p>`;
   return h;
 }
 
@@ -266,6 +268,10 @@ function renderDraft(r) {
   let h = `<p class="meta">Subject</p><p><b>${esc(dr.subject)}</b></p>`;
   const hook = d.hook || (r.draft && r.draft.hook) || r.evidence;
   if (hook) h += `<p class="meta">Hook and evidence</p><p>${esc(typeof hook === "string" ? hook : JSON.stringify(hook))}</p>`;
+  const q = results.qualify && results.qualify.result, sigs = q && ((q.score || {}).signals || []);
+  const known = (sigs || []).filter(s => s.status === "known" && s.points_min > 0 && (s.evidence || []).length);
+  if (known.length) h += `<p class="meta">Evidence the email can lean on (from the qualification)</p>` + known.map(s => `<p><b>${esc(s.label || s.id)}</b>${(s.evidence || []).slice(0, 2).map(e => quote(e.quote, e.source_url)).join("")}</p>`).join("");
+  h += `<p class="meta">Body</p><div class="mail">${esc(dr.body)}</div>`;
   return h;
 }
 

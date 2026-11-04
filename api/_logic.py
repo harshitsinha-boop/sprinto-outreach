@@ -26,7 +26,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 STAGES = ("scrape", "extract", "qualify", "poc", "draft", "send")
-MAX_BODY_BYTES = 2_000_000
+MAX_BODY_BYTES = 4_000_000  # Vercel caps request bodies at 4.5 MB
 MAX_REQ_PER_MIN = 10
 MAX_RUNS_PER_HOUR = 30
 DEFAULT_HUNTER_BUDGET = 10
