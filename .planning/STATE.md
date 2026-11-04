@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 03
+current_phase: 3
 current_phase_name: ICP Rubric and Bounded Agent Loop
-status: planning
-stopped_at: Phase 2 complete, ready to plan Phase 03
-last_updated: "2026-11-03T10:58:53.099Z"
-last_activity: 2026-11-03
-last_activity_desc: Phase 2 complete, transitioned to Phase 03
-state_head: b77e661cfabe34250d3e1f119a664d532311f6cc
+status: executing
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-11-04T04:20:58.838Z"
+last_activity: 2026-11-04
+last_activity_desc: Phase 3 execution started
+state_head: 8be7796db495b0e6d7bccbef3dcaa56744019a9b
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
   percent: 29
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-03)
 
 **Core value:** For a qualified company, a personalised email addressed to a real named person with a specific, evidence-based hook lands in the inbox, and every decision behind it can be defended from a logged trail.
-**Current focus:** Phase 2 — Runner, CLI and Real Scrape/Extract
+**Current focus:** Phase 3 — ICP Rubric and Bounded Agent Loop
 
 ## Current Position
 
-Phase: 03 — ICP Rubric and Bounded Agent Loop
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-03 — Phase 2 complete, transitioned to Phase 03
+Phase: 3 (ICP Rubric and Bounded Agent Loop) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-11-04 — Phase 3 execution started
 
 Progress: [███░░░░░░░] 29%
 
@@ -64,6 +64,7 @@ Progress: [███░░░░░░░] 29%
 | Phase 02 P01 | 22 min | 2 tasks | 6 files |
 | Phase 02 P02 | 6min | 2 tasks | 12 files |
 | Phase 02 P03 | 9min | 2 tasks | 8 files |
+| Phase 03 P01 | 7 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Recent decisions affecting current work:
 - [Phase 02]: robots.txt answers are stored on disk only for 2xx and 4xx; 5xx and 429 are transient and retried next run
 - [Phase 02]: Page-cache entries carry GUARD_VERSION; any entry without the current version is re-fetched through every guard
 - [Phase 02]: 02-03: extract validation compares quotes to prompt_text (the text the model saw); instruction lines are removed by narrow full-phrase regexes and a quote from a removed line is dropped as instruction_like_text
+- [Phase 03]: Rubric as TOML data (config/icp.toml, icp.1) hashed by sha256 into every run; interval scorer in pure Python
+- [Phase 03]: Rubric models forbid extra keys; scorer counts enterprise customers by list length (de-dup deferred)
 
 ### Pending Todos
 
@@ -112,6 +115,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T10:56:26.149Z
-Stopped at: Phase 2 complete, ready to plan Phase 03
+Last session: 2026-11-04T04:20:58.731Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
