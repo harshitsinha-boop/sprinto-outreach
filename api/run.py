@@ -9,6 +9,9 @@ from pathlib import Path
 
 # Cache and out dirs must live on the only writable path; set before importing the package.
 os.environ.setdefault("OUTREACH_DATA_DIR", "/tmp/outreach")
+# Accept the shorter variable name for the Resend key as an alias.
+if not os.environ.get("RESEND_API_KEY") and os.environ.get("RESEND_KEY"):
+    os.environ["RESEND_API_KEY"] = os.environ["RESEND_KEY"]
 _ROOT = Path(__file__).resolve().parent.parent
 for _p in (str(Path(__file__).resolve().parent), str(_ROOT / "src"), str(_ROOT)):
     if _p not in sys.path:
