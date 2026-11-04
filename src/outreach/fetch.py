@@ -74,7 +74,18 @@ _HIDDEN_STYLE = re.compile(r"(?<![\w-])(display\s*:\s*none|visibility\s*:\s*hidd
 
 def _system_resolve(host: str) -> list[str]:
     """The distinct addresses the system resolver returns for `host`."""
-    infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    infos = None
+    for attempt in range(4):
+        try:
+            infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+            break
+        except socket.gaierror:
+            raise  # a real "no such host" answer is final
+        except OSError:
+            # Serverless resolvers sometimes answer EBUSY/EAGAIN; a short retry clears it.
+            if attempt == 3:
+                raise
+            time.sleep(0.4 * (attempt + 1))
     seen: list[str] = []
     for info in infos:
         addr = str(info[4][0])
@@ -341,8 +352,8 @@ class PageFetcher:
             host = (urlsplit(current).hostname or "").lower()
             try:
                 addresses = resolve(host)
-            except socket.gaierror as e:
-                return fail("error", "dns_failure", f"gaierror: {e}")
+            except OSError as e:  # includes socket.gaierror
+                return fail("error", "dns_failure", f"{type(e).__name__}: {e}")
             if not addresses or not all(is_public_address(a) for a in addresses):
                 return fail("unavailable", "private_address", f"{host} resolves to a non-public address")
 

@@ -171,8 +171,16 @@ def run_stage(
             result=result,
         )
     except Exception as exc:
+        # Name the innermost code location (file:line in function) to make deployed failures
+        # diagnosable. It carries no request data or secrets.
+        where = ""
+        tb = exc.__traceback__
+        while tb is not None and tb.tb_next is not None:
+            tb = tb.tb_next
+        if tb is not None:
+            where = f" @ {Path(tb.tb_frame.f_code.co_filename).name}:{tb.tb_lineno} in {tb.tb_frame.f_code.co_name}"
         return _result(
-            stage, "failed", state, detail=redact(f"{type(exc).__name__}: {exc}", settings)
+            stage, "failed", state, detail=redact(f"{type(exc).__name__}: {exc}{where}", settings)
         )
 
     new_state = {k: v for k, v in state.items() if k not in ("stopped_at", "stop_reason")}
