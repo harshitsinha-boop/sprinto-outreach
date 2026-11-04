@@ -25,7 +25,8 @@ from _logic import MAX_BODY_BYTES, WebApp  # noqa: E402
 
 
 def make_handler(app: WebApp):
-    index = (ROOT / "web" / "index.html").read_bytes()
+    web = Path(os.environ.get("WEB_DIR") or ROOT / "web").resolve()
+    types = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript"}
 
     class Dev(BaseHTTPRequestHandler):
         def _send(self, status: int, data: bytes, ctype: str) -> None:
@@ -46,8 +47,10 @@ def make_handler(app: WebApp):
         def do_GET(self) -> None:  # noqa: N802
             if self.path.startswith("/api/"):
                 return self._api("GET")
-            if self.path in ("/", "/index.html"):
-                return self._send(200, index, "text/html; charset=utf-8")
+            name = "index.html" if self.path in ("/", "") else self.path.split("?", 1)[0].lstrip("/")
+            f = (web / name).resolve()
+            if f.parent == web and f.suffix in types and f.is_file():
+                return self._send(200, f.read_bytes(), types[f.suffix])
             self._send(404, b"not found", "text/plain")
 
         def do_POST(self) -> None:  # noqa: N802

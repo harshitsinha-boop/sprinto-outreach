@@ -38,7 +38,8 @@ class handler(BaseHTTPRequestHandler):  # noqa: N801 - Vercel requires this name
         data = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("content-type", "application/json")
-        self.send_header("cache-control", "no-store")
+        public = self.path.split("?", 1)[0].rstrip("/") == "/api/rubric" and status == 200
+        self.send_header("cache-control", "public, max-age=300" if public else "no-store")
         self.send_header("content-length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)

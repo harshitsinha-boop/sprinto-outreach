@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -274,8 +275,88 @@ def test_gray_band_override_end_to_end_with_fake():
     assert out["status"] == "stopped" and out["stop_reason"] == "disqualified"
 
 
+def _ui_text():
+    return "".join((ROOT / "web" / n).read_text() for n in ("index.html", "app.js", "app.css"))
+
+
 def test_ui_has_override_button_only_for_insufficient_data():
+    ui = _ui_text()
+    assert "Continue anyway (manual override, logged)" in ui
+    assert 'stop_reason === "insufficient_data"' in ui
+    assert "qualified by manual override, not by the rubric" in ui.lower()
+
+
+def test_ui_has_required_sections_and_ids():
     html = (ROOT / "web" / "index.html").read_text()
-    assert "Continue anyway (manual override, logged)" in html
-    assert 'stop_reason === "insufficient_data"' in html
-    assert "qualified by manual override, not by the rubric" in html
+    for needle in ('id="how"', 'id="fit"', 'id="runner"', 'id="summary"', 'id="log"', 'id="faq"',
+                   'class="site-footer"', 'id="themeBtn"', 'id="domains"', 'id="optHunter"',
+                   'id="optOverride"', 'id="dlBtn"', 'id="sumTable"', "Plus+Jakarta+Sans",
+                   'role="alert"', 'aria-live'):
+        assert needle in html, needle
+    css = (ROOT / "web" / "app.css").read_text()
+    assert "prefers-reduced-motion" in css and "prefers-color-scheme: dark" in css
+    assert '[data-theme="dark"]' in css and "--color-primary: #2563EB" in css and "#EA580C" in css
+    js = (ROOT / "web" / "app.js").read_text()
+    for needle in ("/api/rubric", "aria-sort", "Storage\"]", "Blob", "confirm_send", "override_insufficient"):
+        assert needle in js, needle
+    assert not re.search(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]", _ui_text())  # no emoji icons
+
+
+def test_ui_javascript_parses():
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not installed")
+    for name in ("app.js",):
+        r = subprocess.run([node, "--check", str(ROOT / "web" / name)], capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+
+
+def test_rubric_endpoint_public_shape_and_no_secrets():
+    app = make_app()
+    status, out = app.handle("GET", "/api/rubric", {}, b"", "1.1.1.1")  # no password needed
+    assert status == 200
+    assert out["version"] and len(out["sha256"]) == 64
+    assert (out["qualify_min"], out["reject_max"]) == (60, 45)
+    assert out["gates"] and out["penalties"]
+    assert sum(s["weight"] for s in out["signals"]) == 100
+    first = out["signals"][0]
+    assert {"id", "label", "weight", "where_found"} <= set(first)
+    import hashlib
+
+    assert out["sha256"] == hashlib.sha256((ROOT / "config" / "icp.toml").read_bytes()).hexdigest()
+    blob = json.dumps(out)
+    assert CANARY not in blob and PW not in blob
+    # public even when unconfigured
+    assert WebApp({}).handle("GET", "/api/rubric", {}, b"", "1")[0] == 200
+
+
+def test_default_rate_limit_is_40_per_minute():
+    import _logic
+
+    assert _logic.MAX_REQ_PER_MIN == 40 and _logic.MAX_RUNS_PER_HOUR == 20
+    app = make_app(limiter=RateLimiter(), clock=lambda: 5.0)
+    codes = [post(app, {"stage": "extract", "domain": "acme.com"})[0] for _ in range(41)]
+    assert codes[:40] == [200] * 40 and codes[40] == 429
+
+
+def test_live_hunter_opt_out_from_page():
+    seen = []
+
+    def spy(stage, state, *, settings, send=False, live_hunter=False, **kw):
+        seen.append(live_hunter)
+        return fake_run_stage(stage, state, settings=settings)
+
+    app = make_app(run_stage=spy)
+    post(app, {"stage": "poc", "domain": "acme.com", "live_hunter": False})
+    post(app, {"stage": "poc", "domain": "acme.com"})
+    assert seen == [False, True]
+    assert app.hunter_remaining() == 9  # opt-out did not spend budget
+
+
+def test_vercel_functions_include_rubric_file():
+    cfg = json.loads((ROOT / "vercel.json").read_text())
+    assert "config" in cfg["functions"]["api/*.py"]["includeFiles"]
+    assert (ROOT / "api" / "rubric.py").is_file()

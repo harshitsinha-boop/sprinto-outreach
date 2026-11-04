@@ -16,19 +16,21 @@ Security properties:
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import os
 import re
 import threading
 import time
+import tomllib
 from collections import defaultdict, deque
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
 STAGES = ("scrape", "extract", "qualify", "poc", "draft", "send")
 MAX_BODY_BYTES = 4_000_000  # Vercel caps request bodies at 4.5 MB
-MAX_REQ_PER_MIN = 10
+MAX_REQ_PER_MIN = 40  # a batch of 5 domains x 6 stages needs ~30
 MAX_RUNS_PER_HOUR = 20
 DEFAULT_HUNTER_BUDGET = 10
 DEFAULT_MAX_SENDS_PER_HOUR = 5
@@ -44,6 +46,48 @@ NOT_CONFIGURED_MSG = (
     + ", ".join(REQUIRED_ENV)
     + "."
 )
+
+
+RUBRIC_PATH = Path(__file__).resolve().parent.parent / "config" / "icp.toml"
+
+
+def load_rubric(path: Path = RUBRIC_PATH) -> dict:
+    """Public, non-secret view of the ICP rubric, parsed from the exact file the pipeline hashes."""
+    raw = path.read_bytes()
+    cfg = tomllib.loads(raw.decode("utf-8"))
+    th = cfg.get("thresholds", {})
+    signals = []
+    for sig in cfg.get("signals", []):
+        item = {
+            "id": sig["id"], "label": sig.get("label", sig["id"]), "group": sig.get("group", ""),
+            "weight": sig["weight"], "kind": sig.get("kind", ""), "field": sig.get("field", ""),
+            "where_found": list(sig.get("target_kinds", [])),
+        }
+        if isinstance(sig.get("points"), dict):
+            item["points"] = {str(k): v for k, v in sig["points"].items()}
+        if sig.get("tiers"):
+            item["tiers"] = sig["tiers"]
+        if sig.get("keyword_groups"):
+            item["keyword_groups"] = sig["keyword_groups"]
+        signals.append(item)
+    return {
+        "version": cfg.get("version", ""),
+        "description": cfg.get("description", ""),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "qualify_min": th.get("qualify_min"),
+        "reject_max": th.get("reject_max"),
+        "gates": [
+            {"id": g["id"], "label": g.get("label", g["id"]), "field": g.get("field", ""),
+             "fail_values": g.get("fail_values", [])}
+            for g in cfg.get("gates", [])
+        ],
+        "signals": signals,
+        "penalties": [
+            {"id": p["id"], "label": p.get("label", p["id"]), "points": p["points"],
+             "requires": p.get("requires", []), "excludes": p.get("excludes", [])}
+            for p in cfg.get("penalties", [])
+        ],
+    }
 
 
 class RequestError(Exception):
@@ -123,7 +167,10 @@ class WebApp:
         settings_factory: Callable | None = None,
         clock: Callable[[], float] = time.time,
         limiter: RateLimiter | None = None,
+        rubric_path: Path = RUBRIC_PATH,
     ):
+        self._rubric: dict | None = None
+        self._rubric_path = rubric_path
         self._env = env if env is not None else os.environ
         self._run_stage = run_stage
         self._settings_factory = settings_factory
@@ -236,6 +283,13 @@ class WebApp:
         h = {k.lower(): v for k, v in headers.items()}
         expected = self._env.get("APP_PASSWORD") or ""
         route = path.split("?", 1)[0].rstrip("/")
+        if route == "/api/rubric" and method == "GET":  # public, cached, no secrets
+            if self._rubric is None:
+                try:
+                    self._rubric = load_rubric(self._rubric_path)
+                except (OSError, ValueError, KeyError):
+                    raise RequestError(500, "rubric_unavailable", "rubric file could not be read") from None
+            return 200, self._rubric
         if route == "/api/health" and method == "GET":  # public, booleans only
             return 200, {"ok": True, "configured": self.configured(), "auth_required": bool(expected)}
         wait = self.limiter.check(
@@ -286,7 +340,9 @@ class WebApp:
                 "Send limit reached for now (WEB_MAX_SENDS_PER_HOUR); "
                 "showing the dry-run preview instead. Nothing was sent."
             )
-        live_hunter = stage == "poc" and self._take_hunter()
+        # the page may opt out of live Hunter (cache/fixture only); it can never opt IN past the budget
+        want_live = req.get("live_hunter") is not False
+        live_hunter = stage == "poc" and want_live and self._take_hunter()
         state = {**state, "domain": domain}  # the validated domain always wins
         kwargs = {}
         if stage == "qualify" and req.get("override_insufficient") is True:

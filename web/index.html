@@ -4,349 +4,239 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Sprinto outreach runner</title>
-<style>
-  :root { color-scheme: light dark; --bg:#f6f7f9; --card:#fff; --fg:#14171c; --muted:#616a78; --line:#dde1e7;
-    --accent:#4f46e5; --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --code:#eef0f4; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0e1116; --card:#171b22; --fg:#e7eaf0; --muted:#98a2b3;
-    --line:#2a313c; --accent:#8b8bff; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --code:#0b0e13; } }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 0 0 10px; }
-  .sub { color: var(--muted); margin: 0 0 20px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
-  label { display:block; font-weight:600; margin-bottom:6px; }
-  input[type=text], input[type=password] { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
-    background:var(--bg); color:var(--fg); font:inherit; }
-  input:focus-visible, button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .row > input { flex:1 1 220px; }
-  button { padding:10px 16px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff;
-    font:inherit; font-weight:600; cursor:pointer; }
-  button.secondary { background:transparent; color:var(--accent); }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  .hint { color:var(--muted); font-size:13px; margin-top:6px; }
-  .err { color:var(--bad); font-weight:600; margin-top:8px; white-space:pre-wrap; }
-  ol.stages { list-style:none; margin:0; padding:0; }
-  ol.stages li { border-top:1px solid var(--line); padding:10px 0; }
-  ol.stages li:first-child { border-top:0; }
-  .head { display:flex; gap:10px; align-items:center; }
-  .icon { width:22px; text-align:center; font-weight:700; }
-  .name { font-weight:600; text-transform:capitalize; }
-  .st-ok .icon { color:var(--ok); } .st-stopped .icon { color:var(--warn); } .st-failed .icon { color:var(--bad); }
-  .st-pending { color:var(--muted); }
-  .spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--accent);
-    border-radius:50%; animation:sp .8s linear infinite; }
-  @keyframes sp { to { transform:rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .spin { animation-duration:2.4s; } }
-  .detail { margin:4px 0 0 32px; color:var(--muted); }
-  pre { background:var(--code); border:1px solid var(--line); border-radius:8px; padding:10px; overflow:auto;
-    white-space:pre-wrap; word-break:break-word; font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; margin:6px 0; }
-  details { margin:6px 0 0 32px; } summary { cursor:pointer; color:var(--accent); }
-  .badge { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid var(--line); }
-  .b-ok { color:var(--ok); } .b-bad { color:var(--bad); } .b-warn { color:var(--warn); }
-  table { width:100%; border-collapse:collapse; font-size:14px; } th,td { text-align:left; padding:6px 8px; border-top:1px solid var(--line); vertical-align:top; }
-  blockquote { margin:4px 0; padding:2px 10px; border-left:3px solid var(--accent); color:var(--muted); }
-  .mail { white-space:pre-wrap; background:var(--code); border:1px solid var(--line); border-radius:8px; padding:12px; }
-  .confirm { border:1px solid var(--warn); border-radius:10px; padding:12px; margin-top:12px; }
-  .hidden { display:none !important; }
-  .meta { color:var(--muted); font-size:13px; }
-</style>
+<meta name="color-scheme" content="light dark">
+<title>Sprinto Outreach: qualify, find the person, write the email</title>
+<meta name="description" content="Cold outreach at scale for Sprinto: scrape, extract, qualify against a defensible ICP, find the decision-maker, draft and send a personalised email, with every decision explained.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="app.css">
+<script>
+  // Apply the saved theme before first paint to avoid a flash.
+  try { var t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 </head>
 <body>
-<main>
-  <h1>Sprinto outreach runner</h1>
-  <p class="sub">Free to use, no sign-in. Enter a company domain and the pipeline scrapes, extracts, qualifies, finds a contact and drafts an email. Any email is sent only to the site owner's own address, never to the company.</p>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-user-search" viewBox="0 0 24 24"><circle cx="10" cy="8" r="5"/><path d="M2 21a8 8 0 0 1 10.434-7.62"/><circle cx="18" cy="18" r="3"/><path d="m22 22-1.9-1.9"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-user-x" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/></symbol>
+  <symbol id="i-file-x" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m14.5 12.5-5 5"/><path d="m9.5 12.5 5 5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol>
+  <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+</svg>
 
-  <section class="card hidden" id="notConfigured" role="status">
-    <h2>Not configured yet</h2>
-    <p class="meta" style="margin:0">This runner is not set up on the server yet. Please check back soon.</p>
-  </section>
+<a class="skip" href="#runner">Skip to the runner</a>
 
-  <section class="card hidden" id="login">
-    <label for="pw">Password</label>
-    <div class="row">
-      <input id="pw" type="password" autocomplete="current-password" placeholder="Shared password">
-      <button id="loginBtn">Unlock</button>
+<header class="site-header">
+  <div class="wrap header-in">
+    <a class="brand" href="#top" aria-label="Sprinto Outreach, top of page">
+      <span class="logo" aria-hidden="true"><svg class="ic"><use href="#i-layers"/></svg></span>
+      <span>Sprinto Outreach</span>
+    </a>
+    <nav aria-label="Sections" class="nav">
+      <a href="#how">How it works</a>
+      <a href="#fit">Right fit</a>
+      <a href="#runner">Runner</a>
+      <a href="#log">Decision log</a>
+      <a href="#faq">Guardrails</a>
+    </nav>
+    <button id="themeBtn" class="icon-btn" type="button" aria-label="Switch to dark theme" aria-pressed="false">
+      <svg class="ic" id="themeIcon" aria-hidden="true"><use href="#i-moon"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <!-- A. Hero -->
+  <section class="hero" aria-labelledby="heroTitle">
+    <div class="wrap hero-in">
+      <p class="eyebrow">Cold outreach at scale, for Sprinto</p>
+      <h1 id="heroTitle">Find the companies that need compliance now, and write the one email worth answering.</h1>
+      <p class="lead">Give it company domains. It reads their public site, scores them against a published ICP, finds the right decision-maker, drafts a personalised email with a specific hook, and shows you why every decision was made.</p>
+      <div class="hero-cta">
+        <a class="btn btn-cta" href="#runner"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg>Try the runner</a>
+        <a class="btn btn-secondary" href="#fit"><svg class="ic" aria-hidden="true"><use href="#i-target"/></svg>See who counts as a fit</a>
+      </div>
+      <ul class="hero-points">
+        <li><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><span><strong>Owner-only recipient.</strong> Every email goes to the site owner's own inbox, never to the company or the person it is about.</span></li>
+        <li><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg><span><strong>Dry run first.</strong> You see the exact email before anything is sent, and sending needs an explicit confirmation.</span></li>
+        <li><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg><span><strong>Every claim cited.</strong> Each sentence in the email links to a quote and source page.</span></li>
+      </ul>
     </div>
-    <div class="err" id="loginErr" role="alert"></div>
   </section>
 
-  <section class="card hidden" id="runCard">
-    <label for="domain">Company domain</label>
-    <div class="row">
-      <input id="domain" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com">
-      <button id="runBtn">Run pipeline</button>
-      <button id="lockBtn" class="secondary" title="Forget the password for this tab">Lock</button>
-    </div>
-    <div class="hint" id="runsLeft"></div>
-    <div class="err" id="runErr" role="alert"></div>
-  </section>
-
-  <section class="card hidden" id="progressCard">
-    <h2>Progress</h2>
-    <ol class="stages" id="stages" aria-live="polite"></ol>
-  </section>
-
-  <section class="card hidden" id="overrideCard">
-    <h2>Score is in the unknown band</h2>
-    <p class="meta" id="overrideText" style="margin:0 0 10px"></p>
-    <button id="overrideBtn" class="secondary">Continue anyway (manual override, logged)</button>
-    <div class="hint">The rubric could not decide (insufficient data). Continuing is your call, it is recorded in the decision log, and it is never offered for disqualified companies. Mail still goes only to the owner.</div>
-  </section>
-
-  <section class="card hidden" id="sendCard">
-    <h2>Draft ready</h2>
-    <div id="draftPreview"></div>
-    <div class="confirm">
-      <label style="font-weight:400"><input type="checkbox" id="sendOk"> I understand this sends a real email, to the owner's address only (<b id="ownerAddr">the owner</b>).</label>
-      <div class="row" style="margin-top:10px">
-        <button id="sendBtn" disabled>Send the email to <span id="ownerBtn">the owner</span></button>
-        <button id="previewBtn" class="secondary">Dry-run preview only</button>
+  <!-- B. How it works -->
+  <section id="how" class="section" aria-labelledby="howTitle">
+    <div class="wrap">
+      <h2 id="howTitle">How it works: seven steps, each one inspectable</h2>
+      <p class="section-lead">Every domain walks through the same pipeline. Each step stops cleanly with a reason when it cannot continue.</p>
+      <ol class="steps-grid" id="howSteps"></ol>
+      <div class="notes">
+        <p class="note"><svg class="ic" aria-hidden="true"><use href="#i-user-search"/></svg><span><strong>Contact lookup.</strong> The decision-maker comes from Hunter.io Domain Search (Option A in the brief), then is ranked deterministically by company-size band.</span></p>
+        <p class="note"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg><span><strong>Sending.</strong> Mail goes through Resend's sandbox sender to the owner's inbox. This replaces the brief's Gmail step by owner decision.</span></p>
       </div>
     </div>
-    <div class="err" id="sendErr" role="alert"></div>
   </section>
 
-  <section class="card hidden" id="logCard">
-    <h2>Decision log</h2>
-    <div id="log"></div>
+  <!-- C. ICP -->
+  <section id="fit" class="section alt" aria-labelledby="fitTitle">
+    <div class="wrap">
+      <h2 id="fitTitle">Who is a right fit, and why we can defend it</h2>
+      <p class="section-lead">Sprinto sells compliance automation (SOC 2, ISO 27001, GDPR). The best prospects are B2B software companies, typically Series A to C, that are about to be asked for audit evidence by enterprise customers. The rubric below is the whole policy: it is loaded live from the same file the pipeline hashes.</p>
+      <div id="rubricBox" aria-live="polite" aria-busy="true">
+        <div class="skeleton sk-block" aria-hidden="true"></div>
+      </div>
+      <div class="interval card" aria-labelledby="ivTitle">
+        <h3 id="ivTitle">How a score becomes a verdict</h3>
+        <p>Every signal is either <strong>known</strong> (points from a quoted fact) or <strong>unknown</strong>. The company gets a <em>minimum</em> score (unknown counts 0) and a <em>maximum</em> (unknown counts full weight).</p>
+        <ul class="rules">
+          <li><span class="dot ok"></span><span><strong>Qualified</strong> when the minimum is at least <span data-q="qualify_min">60</span>.</span></li>
+          <li><span class="dot bad"></span><span><strong>Rejected</strong> when the maximum is below <span data-q="reject_max">45</span>, or a hard gate fails.</span></li>
+          <li><span class="dot warn"></span><span><strong>Otherwise</strong> a bounded research loop fetches up to 3 more same-domain pages, each with a logged reason. Still unknown: <em>insufficient data</em>.</span></li>
+        </ul>
+        <div class="iv-demo">
+          <div class="iv-controls">
+            <label for="ivMin">Minimum score <output id="ivMinOut">40</output></label>
+            <input id="ivMin" type="range" min="0" max="100" value="40">
+            <label for="ivMax">Maximum score <output id="ivMaxOut">70</output></label>
+            <input id="ivMax" type="range" min="0" max="100" value="70">
+          </div>
+          <div id="ivBar" class="ivbar-wrap"></div>
+          <p id="ivVerdict" class="iv-verdict" role="status"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- D. Runner -->
+  <section id="runner" class="section" aria-labelledby="runTitle">
+    <div class="wrap">
+      <h2 id="runTitle">Runner</h2>
+      <p class="section-lead">Enter up to five company domains. They run one after another, one stage per request. Nothing is emailed until you confirm.</p>
+
+      <div id="notConfigured" class="callout warn" role="status" hidden>
+        <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+        <div><strong>Not configured yet.</strong> The server is missing its API keys or owner email, so runs are paused. Please check back soon.</div>
+      </div>
+
+      <div id="loginBox" class="card login" hidden>
+        <label for="pw">Password</label>
+        <div class="row">
+          <input id="pw" class="input" type="password" autocomplete="current-password" placeholder="Shared password">
+          <button id="loginBtn" class="btn btn-primary" type="button">Unlock</button>
+        </div>
+        <p id="loginErr" class="field-err" role="alert"></p>
+      </div>
+
+      <form id="runForm" class="card runner-form" novalidate>
+        <div class="field">
+          <label for="domains">Company domains</label>
+          <textarea id="domains" class="input" rows="4" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="example.com&#10;another-company.io" aria-describedby="domHelp domErr"></textarea>
+          <p id="domHelp" class="hint">One per line or separated by commas. Up to 5. Paste a URL and it is trimmed to the domain.</p>
+          <div id="chips" class="chips" aria-label="Parsed domains"></div>
+          <p id="domErr" class="field-err" role="alert"></p>
+        </div>
+        <fieldset class="options">
+          <legend>Run options</legend>
+          <label class="check"><input type="checkbox" id="optHunter" checked> <span>Use live Hunter lookup <small>(falls back to cached data when the budget is used up)</small></span></label>
+          <label class="check"><input type="checkbox" id="optOverride" checked> <span>Allow manual override for unknown-band companies <small>(you will be asked; it is logged)</small></span></label>
+        </fieldset>
+        <div class="row actions">
+          <button id="runBtn" class="btn btn-cta" type="submit"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg>Run pipeline</button>
+          <button id="exampleBtn" class="btn btn-secondary" type="button">Load example domains</button>
+          <button id="clearBtn" class="btn btn-ghost" type="button">Clear results</button>
+          <button id="lockBtn" class="btn btn-ghost" type="button" hidden>Lock</button>
+        </div>
+        <p id="runsLeft" class="hint" aria-live="polite"></p>
+      </form>
+
+      <div id="runs" class="runs" aria-live="polite"></div>
+      <div id="emptyRuns" class="empty card">
+        <svg class="ic big" aria-hidden="true"><use href="#i-mail"/></svg>
+        <p><strong>No runs yet.</strong> Add a domain above and press Run pipeline. Your results stay here if you refresh this tab.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- F. Summary -->
+  <section id="summary" class="section alt" aria-labelledby="sumTitle">
+    <div class="wrap">
+      <h2 id="sumTitle">Batch summary</h2>
+      <div id="counts" class="counts" role="status" aria-live="polite"></div>
+      <div id="sumEmpty" class="empty card"><p>The summary table fills in as domains finish.</p></div>
+      <div class="table-wrap" id="sumWrap" hidden>
+        <table class="data" id="sumTable">
+          <caption class="sr">Outcome per domain. Column headers sort the table.</caption>
+          <thead><tr>
+            <th scope="col" aria-sort="none"><button type="button" class="sort" data-k="domain">Domain <svg class="ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th>
+            <th scope="col" aria-sort="none"><button type="button" class="sort" data-k="outcome">Outcome <svg class="ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th>
+            <th scope="col" aria-sort="none"><button type="button" class="sort" data-k="score">Score (min to max) <svg class="ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th>
+            <th scope="col" aria-sort="none"><button type="button" class="sort" data-k="contact">Contact <svg class="ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th>
+            <th scope="col" aria-sort="none"><button type="button" class="sort" data-k="subject">Subject <svg class="ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th>
+            <th scope="col" aria-sort="none"><button type="button" class="sort" data-k="status">Status <svg class="ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th>
+          </tr></thead>
+          <tbody id="sumBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- E. Decision log -->
+  <section id="log" class="section" aria-labelledby="logTitle">
+    <div class="wrap">
+      <h2 id="logTitle">Decision log: defend every decision</h2>
+      <p class="section-lead">For each company: why it qualified, why this person, and why the email says what it says.</p>
+      <div class="row actions">
+        <button id="dlBtn" class="btn btn-secondary" type="button" disabled><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>Download decision log (.md)</button>
+      </div>
+      <div id="logBody" aria-live="polite"></div>
+      <div id="logEmpty" class="empty card"><p>Decisions appear here after a run.</p></div>
+    </div>
+  </section>
+
+  <!-- G. FAQ -->
+  <section id="faq" class="section alt" aria-labelledby="faqTitle">
+    <div class="wrap narrow">
+      <h2 id="faqTitle">Guardrails and FAQ</h2>
+      <div class="acc" id="faqAcc"></div>
+    </div>
   </section>
 </main>
 
-<script>
-"use strict";
-const STAGES = ["scrape","extract","qualify","poc","draft","send"];
-const LABEL = {scrape:"Scrape pages", extract:"Extract facts", qualify:"Qualify company", poc:"Find contact", draft:"Draft email", send:"Send / preview"};
-const MAX_RUNS = 3;
-const $ = id => document.getElementById(id);
-const store = window.sessionStorage;
-let busy = false, state = {}, results = {}, domain = "", owner = "";
+<!-- H. Footer -->
+<footer class="site-footer">
+  <div class="wrap foot-in">
+    <p><strong>Sprinto Outreach</strong> is a Mesa PGP "Cold Outreach, at Scale" project, deployed by the project owner. It is an unofficial demo and is not affiliated with Sprinto.</p>
+    <p class="hint">No API keys or secrets are ever sent to this page. Pipeline calls happen on the server.</p>
+  </div>
+</footer>
 
-function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-function runsUsed() { return parseInt(store.getItem("runs") || "0", 10); }
-function showRuns() { $("runsLeft").textContent = `${Math.max(0, MAX_RUNS - runsUsed())} of ${MAX_RUNS} runs left in this browser session.`; }
+<div id="toasts" class="toasts" role="region" aria-label="Notifications"></div>
 
-async function api(path, body) {
-  const opt = { method: body ? "POST" : "GET", headers: { "x-app-password": store.getItem("pw") || "" } };
-  if (body) { opt.headers["content-type"] = "application/json"; opt.body = JSON.stringify(body); }
-  let res, data;
-  try { res = await fetch(path, opt); } catch (e) { return { status: 0, data: { message: "Network error: could not reach the server." } }; }
-  try { data = await res.json(); } catch (e) { data = { message: `Unexpected response (HTTP ${res.status}).` }; }
-  return { status: res.status, data };
-}
-
-function showForm() { $("login").classList.add("hidden"); $("runCard").classList.remove("hidden"); showRuns(); }
-
-async function unlock() {
-  $("loginErr").textContent = "";
-  const pw = $("pw").value;
-  if (!pw) { $("loginErr").textContent = "Enter the password."; return; }
-  store.setItem("pw", pw);
-  // /api/health is public, so verify the password against an authenticated call
-  const { status, data } = await api("/api/run", { stage: "bogus", domain: "example.com" });
-  if (status === 401) { store.removeItem("pw"); $("loginErr").textContent = "Wrong password."; return; }
-  if (status === 429) { $("loginErr").textContent = data.message || "Too many requests."; return; }
-  $("pw").value = ""; showForm();
-}
-function lock() { store.clear(); location.reload(); }
-
-(async function init() {
-  const { status, data } = await api("/api/health");
-  if (status !== 200) { $("runErr").textContent = data.message || "Could not reach the server."; showForm(); return; }
-  if (!data.configured) { $("notConfigured").classList.remove("hidden"); return; }
-  if (data.auth_required) {
-    if (store.getItem("pw")) showForm(); else $("login").classList.remove("hidden");
-  } else { $("lockBtn").classList.add("hidden"); showForm(); }
-})();
-
-function stageRow(name, status, detail) {
-  let li = $("st-" + name);
-  if (!li) { li = document.createElement("li"); li.id = "st-" + name; $("stages").appendChild(li); }
-  const icon = status === "running" ? '<span class="spin" aria-hidden="true"></span>' : status === "ok" ? "&#10003;" : status === "stopped" ? "&#9888;" : status === "failed" ? "&#10007;" : "&middot;";
-  li.className = "st-" + status;
-  li.innerHTML = `<div class="head"><span class="icon">${icon}</span><span class="name">${esc(LABEL[name])}</span></div>` +
-    (detail ? `<div class="detail">${esc(detail)}</div>` : "");
-  return li;
-}
-
-function addRaw(li, result) {
-  if (result === undefined || result === null) return;
-  const d = document.createElement("details");
-  d.innerHTML = "<summary>Result</summary><pre></pre>";
-  d.querySelector("pre").textContent = JSON.stringify(result, null, 2);
-  li.appendChild(d);
-}
-
-async function runStage(name, extra) {
-  stageRow(name, "running", "Working...");
-  const { status, data } = await api("/api/run", Object.assign({ stage: name, domain, state }, extra || {}));
-  if (status !== 200) {
-    stageRow(name, "failed", `${data.error || "error"}: ${data.message || status}`);
-    if (status === 401) setTimeout(lock, 1500);
-    if (status === 503) $("notConfigured").classList.remove("hidden");
-    return { ok: false, data };
-  }
-  if (data.state) state = data.state;
-  if (data.owner_email) owner = data.owner_email;
-  results[name] = data;
-  const li = stageRow(name, data.status || "ok", [data.stop_reason, data.detail].filter(Boolean).join(" - "));
-  if (data.send_note) $("sendErr").textContent = data.send_note;
-  addRaw(li, data.result);
-  return { ok: data.status === "ok", data };
-}
-
-async function start() {
-  $("runErr").textContent = ""; $("sendErr").textContent = "";
-  if (busy) return;
-  domain = $("domain").value.trim();
-  if (!domain) { $("runErr").textContent = "Enter a company domain."; return; }
-  if (/[\/\s:@]/.test(domain)) { $("runErr").textContent = "Enter a bare domain such as example.com (no scheme or path)."; return; }
-  if (runsUsed() >= MAX_RUNS) { $("runErr").textContent = `Session limit reached (${MAX_RUNS} runs). Close this tab and reopen to continue.`; return; }
-  busy = true; $("runBtn").disabled = true;
-  store.setItem("runs", String(runsUsed() + 1)); showRuns();
-  state = {}; results = {}; owner = ""; $("overrideCard").classList.add("hidden");
-  $("stages").innerHTML = ""; $("progressCard").classList.remove("hidden");
-  ["sendCard", "logCard"].forEach(i => $(i).classList.add("hidden"));
-  STAGES.forEach(s => stageRow(s, "pending", ""));
-  await runFrom(0);
-}
-
-async function runFrom(idx) {
-  let stopped = false;
-  for (const s of STAGES.slice(idx, 5)) {
-    const r = await runStage(s);
-    if (!r.ok) {
-      stopped = true;
-      const d = r.data || {};
-      if (s === "qualify" && d.status === "stopped" && d.stop_reason === "insufficient_data") {
-        const sc = (d.result && d.result.score) || {};
-        $("overrideText").textContent = `Score ${sc.score_min}..${sc.score_max}: not enough evidence to qualify or reject. See the breakdown below.`;
-        $("overrideCard").classList.remove("hidden");
-      }
-      break;
-    }
-  }
-  if (!stopped) {
-    $("overrideCard").classList.add("hidden");
-    STAGES.slice(5).forEach(s => stageRow(s, "pending", "Waiting for your confirmation below."));
-    showSendCard();
-  } else { renderLog(); }
-  busy = false; $("runBtn").disabled = false;
-}
-
-async function overrideContinue() {
-  if (busy) return;
-  busy = true; $("runBtn").disabled = true; $("overrideBtn").disabled = true;
-  const r = await runStage("qualify", { override_insufficient: true });
-  $("overrideBtn").disabled = false;
-  if (!r.ok) { busy = false; $("runBtn").disabled = false; renderLog(); return; }
-  await runFrom(3);
-}
-$("overrideBtn").addEventListener("click", overrideContinue);
-
-function findDraft() {
-  const d = results.draft && results.draft.result;
-  if (!d) return null;
-  const x = d.draft || d;
-  return { subject: x.subject || "", body: x.body || x.text || "" };
-}
-
-function showSendCard() {
-  const dr = findDraft();
-  $("draftPreview").innerHTML = dr ? `<div class="meta">Subject</div><div><b>${esc(dr.subject)}</b></div><div class="meta" style="margin-top:8px">Body</div><div class="mail">${esc(dr.body)}</div>` : "";
-  const o = owner || "the owner";
-  $("ownerAddr").textContent = o; $("ownerBtn").textContent = o;
-  $("sendOk").checked = false; $("sendBtn").disabled = true;
-  $("sendCard").classList.remove("hidden");
-  renderLog();
-}
-
-async function doSend(confirm) {
-  $("sendErr").textContent = ""; if (busy) return; busy = true;
-  $("sendBtn").disabled = true; $("previewBtn").disabled = true;
-  const r = await runStage("send", { confirm_send: confirm });
-  busy = false; $("previewBtn").disabled = false; $("sendBtn").disabled = !$("sendOk").checked;
-  if (!r.ok) $("sendErr").textContent = (r.data && (r.data.message || r.data.detail)) || "Send failed.";
-  else if (confirm && !(r.data && r.data.send_note)) { $("sendCard").classList.add("hidden"); }
-  renderLog();
-}
-$("sendOk").addEventListener("change", () => { $("sendBtn").disabled = !$("sendOk").checked || busy; });
-$("sendBtn").addEventListener("click", () => { if ($("sendOk").checked) doSend(true); });
-$("previewBtn").addEventListener("click", () => doSend(false));
-
-// ---- decision log -------------------------------------------------------------------------
-function quote(q, url) { return q ? `<blockquote>&ldquo;${esc(q)}&rdquo;${url ? ` <span class="meta">${esc(url)}</span>` : ""}</blockquote>` : ""; }
-
-function renderQualify(r) {
-  if (!r) return "";
-  const q = r.qualification || r;
-  const score = q.score || {};
-  let h = `<p><b>Rubric verdict:</b> <span class="badge ${q.verdict === "qualified" ? "b-ok" : "b-bad"}">${esc(q.verdict || "")}</span> ${esc(q.reason || "")}</p>`;
-  if (score.score_min !== undefined) h += `<p class="meta">Score ${esc(score.score_min)}${score.score_max !== score.score_min ? " to " + esc(score.score_max) : ""}${q.thresholds ? " | thresholds " + esc(JSON.stringify(q.thresholds)) : ""}</p>`;
-  if (Array.isArray(score.gates) && score.gates.length)
-    h += "<table><tr><th>Gate</th><th>Status</th><th>Basis</th></tr>" + score.gates.map(g => `<tr><td>${esc(g.label || g.id)}</td><td>${esc(g.status)}</td><td>${esc(g.basis)}${(g.evidence || []).map(e => quote(e.quote, e.source_url)).join("")}</td></tr>`).join("") + "</table>";
-  if (Array.isArray(score.signals))
-    h += "<table><tr><th>Signal</th><th>Points</th><th>Why</th></tr>" + score.signals.map(s => `<tr><td>${esc(s.label || s.id)}<div class="meta">weight ${esc(s.weight)}, ${esc(s.status)}</div></td><td>${esc(s.status === "known" ? "+" + s.points_min : "0.." + s.weight)}</td><td>${esc(s.basis)}${(s.evidence || []).map(e => quote(e.quote, e.source_url)).join("")}</td></tr>`).join("") + "</table>";
-  if (Array.isArray(score.penalties) && score.penalties.length)
-    h += "<p class='meta'>Penalties: " + score.penalties.map(p => esc((p.label || p.id) + " -" + p.points)).join(", ") + "</p>";
-  return h;
-}
-
-function renderContact(r) {
-  if (!r) return "";
-  const c = r.contact || r.chosen || r;
-  const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || c.name || "";
-  let h = `<p><b>${esc(name)}</b>${c.position ? ", " + esc(c.position) : ""}${c.email ? " &lt;" + esc(c.email) + "&gt;" : ""}${c.confidence != null ? ` <span class="meta">confidence ${esc(c.confidence)}</span>` : ""}${c.source ? ` <span class="badge">${esc(c.source)}</span>` : ""}</p>`;
-  const why = r.why || r.reason || r.rationale; if (why) h += `<p>${esc(why)}</p>`;
-  if (r.band_basis) h += `<p class="meta">${esc(r.band_basis)}</p>`;
-  if (Array.isArray(r.risks) && r.risks.length) h += `<p class="meta">Risks: ${r.risks.map(esc).join("; ")}</p>`;
-  return h;
-}
-
-function renderDraft(r) {
-  const dr = findDraft(); if (!dr) return "";
-  const d = r.draft ? r : r;
-  let h = `<p class="meta">Subject</p><p><b>${esc(dr.subject)}</b></p>`;
-  const hook = d.hook || (r.draft && r.draft.hook) || r.evidence;
-  if (hook) h += `<p class="meta">Hook and evidence</p><p>${esc(typeof hook === "string" ? hook : JSON.stringify(hook))}</p>`;
-  const q = results.qualify && results.qualify.result, sigs = q && ((q.score || {}).signals || []);
-  const known = (sigs || []).filter(s => s.status === "known" && s.points_min > 0 && (s.evidence || []).length);
-  if (known.length) h += `<p class="meta">Evidence the email can lean on (from the qualification)</p>` + known.map(s => `<p><b>${esc(s.label || s.id)}</b>${(s.evidence || []).slice(0, 2).map(e => quote(e.quote, e.source_url)).join("")}</p>`).join("");
-  h += `<p class="meta">Body</p><div class="mail">${esc(dr.body)}</div>`;
-  return h;
-}
-
-function renderSent() {
-  const r = results.send && results.send.result; if (!r) return "";
-  const p = r.payload || r;
-  const live = r.mode === "sent" || (results.send && results.send.live_send && r.mode !== "dry_run");
-  return `<p><span class="badge ${live ? "b-ok" : "b-warn"}">${live ? "SENT" : "DRY RUN - not sent"}</span>${r.id ? ` <span class="meta">id ${esc(r.id)}</span>` : ""}</p>` +
-    `<table><tr><th>From</th><td>${esc(p.from)}</td></tr><tr><th>To</th><td>${esc([].concat(p.to || []).join(", "))}</td></tr><tr><th>Subject</th><td>${esc(p.subject)}</td></tr></table>` +
-    `<div class="mail">${esc(p.text || p.body || "")}</div>`;
-}
-
-function renderLog() {
-  const parts = [];
-  const sec = (t, h) => { if (h) parts.push(`<h3 style="margin:14px 0 4px;font-size:14px">${t}</h3>${h}`); };
-  const ov = results.qualify && results.qualify.result && results.qualify.result.override;
-  const banner = ov ? `<p><span class="badge b-warn">MANUAL OVERRIDE</span> <b>qualified by manual override, not by the rubric.</b> ${esc(results.qualify.result.override_note || "")}</p>` : "";
-  if (results.qualify) sec("Why this company", banner + renderQualify(results.qualify.result));
-  if (results.poc) sec("Why this person", renderContact(results.poc.result));
-  if (results.draft) sec("Why this email", renderDraft(results.draft.result || {}));
-  if (results.send) sec("The email", renderSent());
-  const last = Object.values(results).slice(-1)[0];
-  if (last && last.status && last.status !== "ok") sec("Run stopped", `<p><span class="badge b-warn">${esc(last.status)}</span> ${esc([last.stop_reason, last.detail].filter(Boolean).join(" - "))}</p>`);
-  $("log").innerHTML = parts.join("") || "<p class='meta'>Nothing to show yet.</p>";
-  $("logCard").classList.remove("hidden");
-}
-
-$("loginBtn").addEventListener("click", unlock);
-$("pw").addEventListener("keydown", e => { if (e.key === "Enter") unlock(); });
-$("runBtn").addEventListener("click", start);
-$("domain").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
-$("lockBtn").addEventListener("click", lock);
-</script>
+<script src="app.js"></script>
 </body>
 </html>

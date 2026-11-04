@@ -17,8 +17,8 @@ Optional: `APP_PASSWORD` (see below), `WEB_HUNTER_BUDGET` (live Hunter searches 
   every `/api/run` call needs the `x-app-password` header (constant-time compare) and the page shows a
   password box. `/api/health` is always public and returns only `{ok, configured, auth_required}`.
 - Domain input is a bare public hostname only (no scheme, path, port, IPs, localhost, private TLDs).
-- Abuse limits, all in memory per serverless instance (best effort, old entries pruned): 3 runs per
-  browser session (client), 10 requests/minute and 20 run starts/hour per IP, `WEB_HUNTER_BUDGET` live
+- Abuse limits, all in memory per serverless instance (best effort, old entries pruned): 3 "Run pipeline" presses (each up to 5 domains) per
+  browser session (client), 40 requests/minute (a batch of 5 domains needs about 30) and 20 run starts/hour per IP, `WEB_HUNTER_BUDGET` live
   Hunter searches, and `WEB_MAX_SENDS_PER_HOUR` live sends (beyond that the send stage returns the
   dry-run preview with a clear message).
 - Mail goes only to `OWNER_EMAIL`. The send stage ignores any recipient in the request and sends
@@ -34,5 +34,7 @@ stops at qualify, `fail.<x>` fails at scrape.
 
 ## Layout
 
-`web/index.html` UI, `api/run.py` and `api/health.py` Vercel functions, `api/_logic.py` shared
-request logic (tests import it), `api/_fake.py` offline fake pipeline, `vercel.json`, `requirements.txt`.
+`web/index.html`, `web/app.css`, `web/app.js` (vanilla, no build; tokens from `design-system/sprinto-outreach/MASTER.md`),
+`api/run.py`, `api/health.py`, `api/rubric.py` Vercel functions (`GET /api/rubric` is public and returns the
+parsed `config/icp.toml` plus its sha256), `api/_logic.py` shared request logic (tests import it),
+`api/_fake.py` offline fake pipeline, `vercel.json`, `requirements.txt`.
