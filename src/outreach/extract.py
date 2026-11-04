@@ -181,6 +181,90 @@ def _item_reason(item, by_url: dict[str, PageResult]) -> str | None:
     return _locate(quote, page)
 
 
+# ---- band consistency: the quote must support the band the model picked ----
+
+BANDS: dict[str, tuple[int, float]] = {
+    "1-10": (1, 10),
+    "11-50": (11, 50),
+    "51-200": (51, 200),
+    "201-500": (201, 500),
+    "501-1000": (501, 1000),
+    "1001+": (1001, float("inf")),
+}
+_NUM = r"\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?"
+_NUMBER = re.compile(rf"(?<![\w.])({_NUM})\s*([kK](?![a-zA-Z]))?(\+)?")
+_RANGE = re.compile(
+    rf"(?<![\w.])({_NUM})\s*([kK](?![a-zA-Z]))?\s*(?:-|\u2013|\u2014|to)\s*({_NUM})\s*([kK](?![a-zA-Z]))?"
+)
+_YEAR_CONTEXT = re.compile(r"(?:since|in|founded|established|est\.?|copyright|\u00a9)\s*$", re.I)
+_MANY = re.compile(
+    r"thousands?\s+of\s+(?:employees|people|team members|staff|colleagues)"
+    r"|\b(?:1,?000\+|1,?001\+)\s*(?:employees|people|team members|staff)",
+    re.I,
+)
+
+
+def _to_int(num: str, k: str | None) -> float:
+    value = float(num.replace(",", ""))
+    return value * 1000 if k else value
+
+
+def quote_numbers(quote: str) -> tuple[list[float], list[tuple[float, float]]]:
+    """Numbers and ranges in a headcount quote. Handles `1,200`, `10k`, `2.5k` and `190+` (read as
+    190, never as 'at least 190'). A bare year after since/in/founded is not a headcount."""
+    ranges = [
+        (_to_int(m.group(1), m.group(2)), _to_int(m.group(3), m.group(4)))
+        for m in _RANGE.finditer(quote)
+    ]
+    numbers: list[float] = []
+    for m in _NUMBER.finditer(quote):
+        value = _to_int(m.group(1), m.group(2))
+        if (
+            1900 <= value <= 2100
+            and m.group(2) is None
+            and "," not in m.group(1)
+            and _YEAR_CONTEXT.search(quote[: m.start()])
+        ):
+            continue
+        numbers.append(value)
+    return numbers, ranges
+
+
+def headcount_reason(value: str, quote: str) -> str | None:
+    """None when the quote supports the band; else `headcount_no_number` or
+    `headcount_band_mismatch`. Deterministic, so one bad model mapping cannot reach a hard gate."""
+    band = BANDS.get(value)
+    if band is None:
+        return "headcount_band_mismatch"
+    low, high = band
+    if value == "1001+" and _MANY.search(quote):
+        return None
+    numbers, ranges = quote_numbers(quote)
+    if not numbers and not ranges:
+        return "headcount_no_number"
+    if any(low <= n <= high for n in numbers):
+        return None
+    if any(min(a, b) <= high and max(a, b) >= low for a, b in ranges):
+        return None
+    return "headcount_band_mismatch"
+
+
+_STAGE_LETTER = re.compile(r"series[\s-]*([a-z])\b", re.I)
+_STAGE_LETTERS = {"series_a": "a", "series_b": "b", "series_c": "c"}
+
+
+def stage_reason(value: str, quote: str) -> str | None:
+    """Only the cheap check: a `Series X` letter in the quote must agree with the stage value."""
+    letters = [m.lower() for m in _STAGE_LETTER.findall(quote)]
+    if not letters:
+        return None
+    if value in _STAGE_LETTERS:
+        return None if _STAGE_LETTERS[value] in letters else "stage_mismatch"
+    if value == "series_d_or_later":
+        return None if any(letter >= "d" for letter in letters) else "stage_mismatch"
+    return "stage_mismatch"  # a stage word of another kind next to a Series letter
+
+
 def _drop(field: str, item, reason: str) -> DroppedEvidence:
     return DroppedEvidence(
         field=field, quote=item.quote[:200], source_url=item.source_url, reason=reason
@@ -220,6 +304,10 @@ def validate_profile(
             continue
         checked += 1
         reason = _item_reason(item, by_url)
+        if reason is None and name == "headcount":
+            reason = headcount_reason(item.value, item.quote)
+        if reason is None and name == "stage":
+            reason = stage_reason(item.value, item.quote)
         if reason:
             drops.append(_drop(name, item, reason))
             update[name] = None

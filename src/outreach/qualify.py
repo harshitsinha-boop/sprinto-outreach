@@ -36,6 +36,7 @@ from outreach.models import (
     RunRecord,
     SignalScore,
 )
+from outreach.extract import headcount_reason
 from outreach.pagegate import is_usable
 from outreach.scrape import PAGE_KINDS
 
@@ -361,10 +362,20 @@ def _penalties(rubric: Rubric, profile: CompanyProfile) -> list[PenaltyHit]:
     return hits
 
 
+def _trusted(profile: CompanyProfile) -> CompanyProfile:
+    """Defence in depth: a headcount whose quote does not support its band is treated as unknown
+    here too, so the G3 hard gate can only ever fire from a band that passed the check."""
+    hc = profile.headcount
+    if hc is not None and headcount_reason(hc.value, hc.quote) is not None:
+        return profile.model_copy(update={"headcount": None})
+    return profile
+
+
 def score_profile(
     profile: CompanyProfile, kinds_usable: set[str], rubric: Rubric
 ) -> RubricScore:
     """Pure and deterministic: the same evidence, in any list order, gives the same score."""
+    profile = _trusted(profile)
     signals: list[SignalScore] = []
     for rule in rubric.signals:
         if rule.kind == "year_recency":

@@ -83,3 +83,16 @@ Each expected score was re-derived with the icp.2 scorer; these are synthetic pr
 | fit_expected_after_research | 47..77 (62.0) | qualified on expected score, only when research has run; insufficient_data without it |
 
 The version, weights, thresholds and penalties are pinned in `test_repo_rubric_thresholds_are_pinned`.
+
+## Headcount band consistency check (extraction fix, not a rubric change)
+
+Live, attio.com was disqualified by hard gate G3_size_ceiling (headcount 1001+) although the careers
+page says "190+ team members": the model mapped the quote to the wrong band, and the quote-substring
+check only proved the quote was on the page, not that it supported the band. `validate_profile` now
+checks the band against the numbers in the quote (`1,200`, `10k`, `2.5k`, `190+` read as 190, ranges by
+overlap, "thousands of employees" and "1000+ employees" for 1001+). A band the quote does not support is
+dropped to null with reason `headcount_band_mismatch` (or `headcount_no_number` when the quote has no
+number), so the rubric treats it as unknown. `qualify.score_profile` repeats the check, so G3 can only fire
+from a band that passed it. The `Series X` letter of a funding stage is checked the same way
+(`stage_mismatch`). Rubric weights and thresholds are unchanged, so icp.2 stays fixed; no calibration
+fixture needed updating.
