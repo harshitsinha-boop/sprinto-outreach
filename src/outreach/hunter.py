@@ -186,7 +186,11 @@ class FixtureHunter:
     with `no_contact` instead of addressing a real company's mail to a fixture person."""
 
     def __init__(self, path: Path = FIXTURE_PATH):
-        self._fixture = json.loads(Path(path).read_text())
+        try:
+            self._fixture = json.loads(Path(path).read_text())
+        except FileNotFoundError:
+            # Deployed bundles do not ship tests/; an empty fixture keeps every domain at no_contact.
+            self._fixture = {"data": {"domain": "piedpiper.com", "emails": []}, "meta": {"results": 0}}
         self.fixture_domain = normalize_domain(self._fixture["data"]["domain"])
         self.live_calls_this_process = 0
 
