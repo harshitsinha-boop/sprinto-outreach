@@ -12,3 +12,4 @@ out/
 *.egg-info/
 build/
 dist/
+.vercel
