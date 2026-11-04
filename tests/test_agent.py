@@ -13,12 +13,15 @@ from conftest import (
     CANARY_ENV,
     HOME_URL,
     FakeFetcher,
+    FakeGenaiClient,
     FakeHunter,
     FakeLLM,
     default_llm_responses,
+    function_call_response,
+    text_response,
 )
 from outreach.agent import MAX_LOOP_FETCHES, MAX_LOOP_ITERATIONS, research_candidates, run_research
-from outreach.llm import LLMAuthError, LLMError, LLMQuotaError
+from outreach.llm import LLMAuthError, LLMClient, LLMError, LLMQuotaError
 from outreach.models import (
     CompanyProfile,
     ComplianceMention,
@@ -590,3 +593,32 @@ def test_breakdown_shows_research_steps():
     fetched = next(line for line in lines if ABOUT_URLS[0] in line)
     assert '"about"' in fetched and "fetched" in fetched
     assert "\x1b" not in text
+
+
+def test_rerun_of_loop_company_makes_no_new_gemini_calls(ctx, fake_sleep, tmp_path):
+    cache = tmp_path / "llm-cache"
+    key = CANARY_ENV["GEMINI_API_KEY"]
+    queue = [
+        text_response(thin_profile().model_dump_json()),
+        function_call_response(
+            "fetch_page", {"url": TRUST_URL, "reason": "resolve compliance_pursuit"}
+        ),
+        text_response(trust_profile().model_dump_json()),
+        text_response(default_llm_responses()["draft"].model_dump_json()),
+    ]
+    first = LLMClient(key, cache, client=FakeGenaiClient(queue), sleep=fake_sleep)
+    ctx.llm = first
+    ctx.hunter = FakeHunter()
+    ctx.fetcher = FakeFetcher(THIN_HOME_TEXT, by_url={TRUST_URL: TRUST_TEXT})
+    rec = run_one("example.com", ctx)
+    assert rec.status == "dry_run"
+    assert stage_output(rec, "qualify")["research"]["stop_reason"] == "sufficient_data"
+    assert first.stats.api_calls == 4 and first._c.models.queue == []
+
+    second = LLMClient(key, cache, client=FakeGenaiClient([]), sleep=fake_sleep)
+    ctx.llm = second
+    rerun = run_one("example.com", ctx)
+    assert rerun.status == "dry_run"
+    assert second._c.models.calls == [] and second.stats.api_calls == 0
+    assert second.stats.cache_hits == 4  # extract, the tool turn, research_extract and draft
+    assert rerun.counters["llm_api_calls"] == 0

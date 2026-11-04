@@ -21,6 +21,7 @@ from conftest import (
     function_call_response,
     text_response,
 )
+from outreach.agent import FETCH_TOOL
 from outreach.llm import (
     LLMAuthError,
     LLMClient,
@@ -28,9 +29,10 @@ from outreach.llm import (
     LLMQuotaError,
     LLMSchemaError,
     build_config,
+    build_tool_config,
     gemini_schema,
 )
-from outreach.models import CompanyProfile, EmailDraft
+from outreach.models import CompanyProfile, EmailDraft, ToolResult
 
 KEY = CANARY_ENV["GEMINI_API_KEY"]
 MODEL = "gemini-3.5-flash-lite"
@@ -468,3 +470,165 @@ def test_wire_429_retry_after_real_error_parse(fake_sleep):
 def test_function_calling_helper_builders_available():
     # sanity: the fakes used by the smoke tests can be built
     assert function_call_response("fetch_page", {"url": "u", "reason": "r"}).function_calls
+
+
+# ------------------------------------------------------------ tool sessions (manual FC)
+
+FETCH_ARGS = {"url": "https://example.com/trust-center", "reason": "resolve compliance_pursuit"}
+RESULT = [ToolResult(name="fetch_page", response={"status": "fetched", "score_min": 70})]
+
+
+def tool_session(client, **over):
+    args = dict(model=MODEL, system="agent system", tool=FETCH_TOOL, purpose="agent")
+    args.update(over)
+    return client.start_tool_session(**args)
+
+
+def test_tool_config_never_mixes_schema_and_tools():
+    cfg = build_tool_config(
+        system="sys", tool=FETCH_TOOL, max_output_tokens=256, thinking_level="LOW"
+    )
+    declarations = cfg.tools[0].function_declarations
+    assert [d.name for d in declarations] == ["fetch_page"] and len(cfg.tools) == 1
+    assert sorted(declarations[0].parameters_json_schema["required"]) == ["reason", "url"]
+    assert cfg.automatic_function_calling.disable is True
+    calling = cfg.tool_config.function_calling_config
+    assert str(getattr(calling.mode, "value", calling.mode)) == "ANY"
+    assert calling.allowed_function_names == ["fetch_page"]
+    for name in (
+        "response_mime_type",
+        "response_json_schema",
+        "response_schema",
+        "temperature",
+        "top_p",
+        "top_k",
+    ):
+        assert getattr(cfg, name) is None, name
+    assert cfg.thinking_config is not None
+
+
+def test_tool_session_wire_role_user_and_verbatim_signature():
+    fc_body = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [
+                        {"functionCall": {"name": "fetch_page", "args": FETCH_ARGS}, "thoughtSignature": "c2ln"}
+                    ],
+                },
+                "finishReason": "STOP",
+            }
+        ]
+    }
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.post(GEN_URL.format(model=MODEL)).mock(
+            side_effect=[httpx.Response(200, json=fc_body), httpx.Response(200, json=_ok_body("done"))]
+        )
+        session = tool_session(LLMClient(KEY, cache_dir=None))
+        first = session.send("go")
+        second = session.respond(RESULT)
+        sent = [json.loads(c.request.content) for c in route.calls]
+    assert [c.name for c in first.calls] == ["fetch_page"] and first.calls[0].args == FETCH_ARGS
+    assert second.calls == [] and second.text == "done"
+    assert sent[0]["toolConfig"]["functionCallingConfig"]["mode"] == "ANY"
+    assert sent[0]["tools"][0]["functionDeclarations"][0]["name"] == "fetch_page"
+    for body in sent:
+        gen = body.get("generationConfig", {})
+        assert "responseJsonSchema" not in gen and "responseMimeType" not in gen
+    contents = sent[1]["contents"]
+    model_turn = next(c for c in contents if c["role"] == "model")
+    assert model_turn["parts"][0]["thoughtSignature"] == "c2ln"
+    assert contents[-1]["role"] == "user"
+    assert contents[-1]["parts"][0]["functionResponse"]["name"] == "fetch_page"
+
+
+def test_tool_session_reads_role_from_smoke(monkeypatch, fake_sleep):
+    monkeypatch.setattr("outreach.smoke.TOOL_RESULT_ROLE", "user-x")
+    client = make([function_call_response("fetch_page", FETCH_ARGS), text_response("done")], fake_sleep)
+    session = tool_session(client)
+    session.send("go")
+    session.respond(RESULT)
+    assert calls_of(client)[1]["contents"][-1].role == "user-x"
+
+
+def test_tool_session_rejects_automatic_function_calling_history(fake_sleep):
+    response = types.GenerateContentResponse(
+        candidates=function_call_response("fetch_page", FETCH_ARGS).candidates,
+        automatic_function_calling_history=[
+            types.Content(role="user", parts=[types.Part.from_text(text="x")])
+        ],
+    )
+    session = tool_session(make([response], fake_sleep))
+    with pytest.raises(LLMError, match="automatic function calling ran"):
+        session.send("go")
+
+
+def test_tool_session_retries_429(fake_sleep):
+    client = make(
+        [api_error(429, "RESOURCE_EXHAUSTED"), function_call_response("fetch_page", FETCH_ARGS)],
+        fake_sleep,
+    )
+    reply = tool_session(client).send("go")
+    assert [c.name for c in reply.calls] == ["fetch_page"]
+    assert (client.stats.retries, client.stats.api_calls) == (1, 2)
+
+
+SIGNATURE = b"\x00\x01thought-signature"
+
+
+def run_two_turns(client):
+    """One send and one respond; returns (send reply, respond reply, session)."""
+    session = tool_session(client)
+    first = session.send("go")
+    second = session.respond(RESULT)
+    return first, second, session
+
+
+def test_tool_session_cache_hit_makes_no_call_and_keeps_signature(fake_sleep, tmp_path):
+    cache = tmp_path / "llm"
+    first_client = make(
+        [
+            function_call_response("fetch_page", FETCH_ARGS, SIGNATURE),
+            function_call_response("fetch_page", FETCH_ARGS),
+        ],
+        fake_sleep,
+        cache,
+    )
+    a1, a2, _ = run_two_turns(first_client)
+    assert not a1.from_cache and not a2.from_cache and first_client.stats.api_calls == 2
+    second_client = make([], fake_sleep, cache)
+    b1, b2, session = run_two_turns(second_client)
+    assert calls_of(second_client) == [] and second_client.stats.api_calls == 0
+    assert second_client.stats.cache_hits == 2
+    assert b1.from_cache and b2.from_cache
+    assert b1.calls == a1.calls and b2.calls == a2.calls
+    assert session.contents[1].parts[0].thought_signature == SIGNATURE
+
+
+def test_tool_session_cache_key_changes_with_system_and_version(fake_sleep, tmp_path):
+    cache = tmp_path / "llm"
+    queue = [function_call_response("fetch_page", FETCH_ARGS) for _ in range(3)]
+    client = make(queue, fake_sleep, cache)
+    tool_session(client).send("go")
+    assert client.stats.api_calls == 1
+    tool_session(client).send("go")  # identical: a hit
+    assert client.stats.api_calls == 1 and client.stats.cache_hits == 1
+    tool_session(client, system="a different system").send("go")
+    assert client.stats.api_calls == 2
+    tool_session(client, prompt_version="2").send("go")
+    assert client.stats.api_calls == 3
+
+
+def test_tool_session_does_not_cache_blocked_response(fake_sleep, tmp_path):
+    cache = tmp_path / "llm"
+    client = make(
+        [blocked_response(), function_call_response("fetch_page", FETCH_ARGS)], fake_sleep, cache
+    )
+    blocked = tool_session(client).send("go")
+    assert blocked.calls == [] and blocked.text is None
+    assert not (cache / "tools").exists() or not list((cache / "tools").glob("*.json"))
+    again = tool_session(client).send("go")
+    assert not again.from_cache and [c.name for c in again.calls] == ["fetch_page"]
+    assert client.stats.api_calls == 2
+    assert len(list((cache / "tools").glob("*.json"))) == 1

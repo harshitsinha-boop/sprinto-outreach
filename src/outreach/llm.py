@@ -168,6 +168,14 @@ def _reply_text(content: types.Content) -> str | None:
     return "".join(parts) or None
 
 
+def _content_calls(content: types.Content) -> list[ToolCall]:
+    return [
+        ToolCall(name=p.function_call.name or "", args=dict(p.function_call.args or {}))
+        for p in content.parts or []
+        if p.function_call is not None
+    ]
+
+
 class ToolSession:
     """One manual function-calling conversation. Holds the history as SDK Content objects and
     appends each model turn verbatim, which preserves thought signatures. Tool turns are never
@@ -215,7 +223,44 @@ class ToolSession:
         )
         return self._turn()
 
+    def _cache_path(self) -> Path | None:
+        """Keyed by everything that shapes the answer: the request settings and the full history
+        including the turn about to be sent. No API key, timestamp or random value goes in."""
+        cache_dir = self._client.cache_dir
+        if cache_dir is None:
+            return None
+        key = hashlib.sha256(
+            json.dumps(
+                {
+                    "model": self.model,
+                    "system": self.system,
+                    "tool": self.tool.model_dump(),
+                    "thinking_level": self.thinking_level,
+                    "prompt_version": self.prompt_version,
+                    "purpose": self.purpose,
+                    "history": [c.model_dump(mode="json", exclude_none=True) for c in self.contents],
+                },
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        return cache_dir / "tools" / f"{key}.json"
+
+    def _from_cache(self, path: Path | None) -> ToolReply | None:
+        if path is None or not path.exists():
+            return None
+        try:
+            content = types.Content.model_validate(json.loads(path.read_text())["content"])
+        except (ValueError, KeyError, TypeError):
+            return None  # corrupt entry: a miss, overwritten by the live answer
+        self.contents.append(content)
+        self._client.stats.cache_hits += 1
+        return ToolReply(calls=_content_calls(content), text=_reply_text(content), from_cache=True)
+
     def _turn(self) -> ToolReply:
+        path = self._cache_path()
+        cached = self._from_cache(path)
+        if cached is not None:
+            return cached
         cfg = build_tool_config(
             system=self.system,
             tool=self.tool,
@@ -228,9 +273,19 @@ class ToolSession:
         candidate = r.candidates[0] if r.candidates else None
         if candidate is None or candidate.content is None:
             return ToolReply()  # blocked or empty: nothing to append, nothing to cache
-        self.contents.append(candidate.content)
-        calls = [ToolCall(name=c.name or "", args=dict(c.args or {})) for c in r.function_calls or []]
-        return ToolReply(calls=calls, text=_reply_text(candidate.content))
+        content = candidate.content
+        self.contents.append(content)  # verbatim: keeps thought signatures
+        if path is not None:  # cache ONLY a real model turn; never an exception or empty answer
+            atomic_write_json(
+                path,
+                {
+                    "purpose": self.purpose,
+                    "model": self.model,
+                    "prompt_version": self.prompt_version,
+                    "content": content.model_dump(mode="json", exclude_none=True),
+                },
+            )
+        return ToolReply(calls=_content_calls(content), text=_reply_text(content))
 
 
 class LLMClient:
