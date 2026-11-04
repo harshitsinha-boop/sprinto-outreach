@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sprinto outreach runner</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f7f9; --card:#fff; --fg:#14171c; --muted:#616a78; --line:#dde1e7;
+    --accent:#4f46e5; --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --code:#eef0f4; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1116; --card:#171b22; --fg:#e7eaf0; --muted:#98a2b3;
+    --line:#2a313c; --accent:#8b8bff; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --code:#0b0e13; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  label { display:block; font-weight:600; margin-bottom:6px; }
+  input[type=text], input[type=password] { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    background:var(--bg); color:var(--fg); font:inherit; }
+  input:focus-visible, button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > input { flex:1 1 220px; }
+  button { padding:10px 16px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff;
+    font:inherit; font-weight:600; cursor:pointer; }
+  button.secondary { background:transparent; color:var(--accent); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .hint { color:var(--muted); font-size:13px; margin-top:6px; }
+  .err { color:var(--bad); font-weight:600; margin-top:8px; white-space:pre-wrap; }
+  ol.stages { list-style:none; margin:0; padding:0; }
+  ol.stages li { border-top:1px solid var(--line); padding:10px 0; }
+  ol.stages li:first-child { border-top:0; }
+  .head { display:flex; gap:10px; align-items:center; }
+  .icon { width:22px; text-align:center; font-weight:700; }
+  .name { font-weight:600; text-transform:capitalize; }
+  .st-ok .icon { color:var(--ok); } .st-stopped .icon { color:var(--warn); } .st-failed .icon { color:var(--bad); }
+  .st-pending { color:var(--muted); }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--accent);
+    border-radius:50%; animation:sp .8s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration:2.4s; } }
+  .detail { margin:4px 0 0 32px; color:var(--muted); }
+  pre { background:var(--code); border:1px solid var(--line); border-radius:8px; padding:10px; overflow:auto;
+    white-space:pre-wrap; word-break:break-word; font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; margin:6px 0; }
+  details { margin:6px 0 0 32px; } summary { cursor:pointer; color:var(--accent); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid var(--line); }
+  .b-ok { color:var(--ok); } .b-bad { color:var(--bad); } .b-warn { color:var(--warn); }
+  table { width:100%; border-collapse:collapse; font-size:14px; } th,td { text-align:left; padding:6px 8px; border-top:1px solid var(--line); vertical-align:top; }
+  blockquote { margin:4px 0; padding:2px 10px; border-left:3px solid var(--accent); color:var(--muted); }
+  .mail { white-space:pre-wrap; background:var(--code); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .confirm { border:1px solid var(--warn); border-radius:10px; padding:12px; margin-top:12px; }
+  .hidden { display:none !important; }
+  .meta { color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sprinto outreach runner</h1>
+  <p class="sub">Enter a company domain. The pipeline scrapes, extracts, qualifies, finds a contact and drafts an email. Mail only ever goes to the owner's own address.</p>
+
+  <section class="card" id="login">
+    <label for="pw">Password</label>
+    <div class="row">
+      <input id="pw" type="password" autocomplete="current-password" placeholder="Shared password">
+      <button id="loginBtn">Unlock</button>
+    </div>
+    <div class="err" id="loginErr" role="alert"></div>
+  </section>
+
+  <section class="card hidden" id="runCard">
+    <label for="domain">Company domain</label>
+    <div class="row">
+      <input id="domain" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com">
+      <button id="runBtn">Run pipeline</button>
+      <button id="lockBtn" class="secondary" title="Forget the password for this tab">Lock</button>
+    </div>
+    <div class="hint" id="runsLeft"></div>
+    <div class="err" id="runErr" role="alert"></div>
+  </section>
+
+  <section class="card hidden" id="progressCard">
+    <h2>Progress</h2>
+    <ol class="stages" id="stages" aria-live="polite"></ol>
+  </section>
+
+  <section class="card hidden" id="sendCard">
+    <h2>Draft ready</h2>
+    <div id="draftPreview"></div>
+    <div class="confirm">
+      <label style="font-weight:400"><input type="checkbox" id="sendOk"> I understand this sends a real email, to the owner's address only (<b id="ownerAddr">the owner</b>).</label>
+      <div class="row" style="margin-top:10px">
+        <button id="sendBtn" disabled>Send the email to <span id="ownerBtn">the owner</span></button>
+        <button id="previewBtn" class="secondary">Dry-run preview only</button>
+      </div>
+    </div>
+    <div class="err" id="sendErr" role="alert"></div>
+  </section>
+
+  <section class="card hidden" id="logCard">
+    <h2>Decision log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const STAGES = ["scrape","extract","qualify","poc","draft","send"];
+const LABEL = {scrape:"Scrape pages", extract:"Extract facts", qualify:"Qualify company", poc:"Find contact", draft:"Draft email", send:"Send / preview"};
+const MAX_RUNS = 5;
+const $ = id => document.getElementById(id);
+const store = window.sessionStorage;
+let busy = false, state = {}, results = {}, domain = "", owner = "";
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function runsUsed() { return parseInt(store.getItem("runs") || "0", 10); }
+function showRuns() { $("runsLeft").textContent = `${Math.max(0, MAX_RUNS - runsUsed())} of ${MAX_RUNS} runs left in this browser session.`; }
+
+async function api(path, body) {
+  const opt = { method: body ? "POST" : "GET", headers: { "x-app-password": store.getItem("pw") || "" } };
+  if (body) { opt.headers["content-type"] = "application/json"; opt.body = JSON.stringify(body); }
+  let res, data;
+  try { res = await fetch(path, opt); } catch (e) { return { status: 0, data: { message: "Network error: could not reach the server." } }; }
+  try { data = await res.json(); } catch (e) { data = { message: `Unexpected response (HTTP ${res.status}).` }; }
+  return { status: res.status, data };
+}
+
+async function unlock() {
+  $("loginErr").textContent = "";
+  const pw = $("pw").value;
+  if (!pw) { $("loginErr").textContent = "Enter the password."; return; }
+  store.setItem("pw", pw);
+  const { status, data } = await api("/api/health");
+  if (status === 200) {
+    $("pw").value = ""; $("login").classList.add("hidden"); $("runCard").classList.remove("hidden"); showRuns();
+    const miss = Object.entries(data.configured || {}).filter(([, v]) => !v).map(([k]) => k);
+    if (miss.length) $("runErr").textContent = "Server is missing environment variables: " + miss.join(", ");
+  } else {
+    store.removeItem("pw");
+    $("loginErr").textContent = status === 401 ? "Wrong password." : (data.message || "Error " + status);
+  }
+}
+function lock() { store.clear(); location.reload(); }
+if (store.getItem("pw")) { $("login").classList.add("hidden"); $("runCard").classList.remove("hidden"); showRuns();
+  api("/api/health").then(r => { if (r.status !== 200) lock(); }); }
+
+function stageRow(name, status, detail) {
+  let li = $("st-" + name);
+  if (!li) { li = document.createElement("li"); li.id = "st-" + name; $("stages").appendChild(li); }
+  const icon = status === "running" ? '<span class="spin" aria-hidden="true"></span>' : status === "ok" ? "&#10003;" : status === "stopped" ? "&#9888;" : status === "failed" ? "&#10007;" : "&middot;";
+  li.className = "st-" + status;
+  li.innerHTML = `<div class="head"><span class="icon">${icon}</span><span class="name">${esc(LABEL[name])}</span></div>` +
+    (detail ? `<div class="detail">${esc(detail)}</div>` : "");
+  return li;
+}
+
+function addRaw(li, result) {
+  if (result === undefined || result === null) return;
+  const d = document.createElement("details");
+  d.innerHTML = "<summary>Result</summary><pre></pre>";
+  d.querySelector("pre").textContent = JSON.stringify(result, null, 2);
+  li.appendChild(d);
+}
+
+async function runStage(name, extra) {
+  stageRow(name, "running", "Working...");
+  const { status, data } = await api("/api/run", Object.assign({ stage: name, domain, state }, extra || {}));
+  if (status !== 200) {
+    stageRow(name, "failed", `${data.error || "error"}: ${data.message || status}`);
+    if (status === 401) setTimeout(lock, 1500);
+    return { ok: false, data };
+  }
+  if (data.state) state = data.state;
+  if (data.owner_email) owner = data.owner_email;
+  results[name] = data;
+  const li = stageRow(name, data.status || "ok", [data.stop_reason, data.detail].filter(Boolean).join(" - "));
+  addRaw(li, data.result);
+  return { ok: data.status === "ok", data };
+}
+
+async function start() {
+  $("runErr").textContent = ""; $("sendErr").textContent = "";
+  if (busy) return;
+  domain = $("domain").value.trim();
+  if (!domain) { $("runErr").textContent = "Enter a company domain."; return; }
+  if (/[\/\s:@]/.test(domain)) { $("runErr").textContent = "Enter a bare domain such as example.com (no scheme or path)."; return; }
+  if (runsUsed() >= MAX_RUNS) { $("runErr").textContent = `Session limit reached (${MAX_RUNS} runs). Close this tab and reopen to continue.`; return; }
+  busy = true; $("runBtn").disabled = true;
+  store.setItem("runs", String(runsUsed() + 1)); showRuns();
+  state = {}; results = {}; owner = "";
+  $("stages").innerHTML = ""; $("progressCard").classList.remove("hidden");
+  ["sendCard", "logCard"].forEach(i => $(i).classList.add("hidden"));
+  STAGES.forEach(s => stageRow(s, "pending", ""));
+  let stopped = false;
+  for (const s of STAGES.slice(0, 5)) {
+    const r = await runStage(s);
+    if (!r.ok) { stopped = true; break; }
+  }
+  if (!stopped) {
+    STAGES.slice(5).forEach(s => stageRow(s, "pending", "Waiting for your confirmation below."));
+    showSendCard();
+  } else { renderLog(); }
+  busy = false; $("runBtn").disabled = false;
+}
+
+function findDraft() {
+  const d = results.draft && results.draft.result;
+  if (!d) return null;
+  const x = d.draft || d;
+  return { subject: x.subject || "", body: x.body || x.text || "" };
+}
+
+function showSendCard() {
+  const dr = findDraft();
+  $("draftPreview").innerHTML = dr ? `<div class="meta">Subject</div><div><b>${esc(dr.subject)}</b></div><div class="meta" style="margin-top:8px">Body</div><div class="mail">${esc(dr.body)}</div>` : "";
+  const o = owner || "the owner";
+  $("ownerAddr").textContent = o; $("ownerBtn").textContent = o;
+  $("sendOk").checked = false; $("sendBtn").disabled = true;
+  $("sendCard").classList.remove("hidden");
+  renderLog();
+}
+
+async function doSend(confirm) {
+  $("sendErr").textContent = ""; if (busy) return; busy = true;
+  $("sendBtn").disabled = true; $("previewBtn").disabled = true;
+  const r = await runStage("send", { confirm_send: confirm });
+  busy = false; $("previewBtn").disabled = false; $("sendBtn").disabled = !$("sendOk").checked;
+  if (!r.ok) $("sendErr").textContent = (r.data && (r.data.message || r.data.detail)) || "Send failed.";
+  else if (confirm) { $("sendCard").classList.add("hidden"); }
+  renderLog();
+}
+$("sendOk").addEventListener("change", () => { $("sendBtn").disabled = !$("sendOk").checked || busy; });
+$("sendBtn").addEventListener("click", () => { if ($("sendOk").checked) doSend(true); });
+$("previewBtn").addEventListener("click", () => doSend(false));
+
+// ---- decision log -------------------------------------------------------------------------
+function quote(q, url) { return q ? `<blockquote>&ldquo;${esc(q)}&rdquo;${url ? ` <span class="meta">${esc(url)}</span>` : ""}</blockquote>` : ""; }
+
+function renderQualify(r) {
+  if (!r) return "";
+  const q = r.qualification || r;
+  const score = q.score || {};
+  let h = `<p><b>Verdict:</b> <span class="badge ${q.verdict === "qualified" ? "b-ok" : "b-bad"}">${esc(q.verdict || "")}</span> ${esc(q.reason || "")}</p>`;
+  if (score.score_min !== undefined) h += `<p class="meta">Score ${esc(score.score_min)}${score.score_max !== score.score_min ? " to " + esc(score.score_max) : ""}${q.thresholds ? " | thresholds " + esc(JSON.stringify(q.thresholds)) : ""}</p>`;
+  if (Array.isArray(score.gates) && score.gates.length)
+    h += "<table><tr><th>Gate</th><th>Status</th><th>Basis</th></tr>" + score.gates.map(g => `<tr><td>${esc(g.label || g.id)}</td><td>${esc(g.status)}</td><td>${esc(g.basis)}${(g.evidence || []).map(e => quote(e.quote, e.source_url)).join("")}</td></tr>`).join("") + "</table>";
+  if (Array.isArray(score.signals))
+    h += "<table><tr><th>Signal</th><th>Points</th><th>Why</th></tr>" + score.signals.map(s => `<tr><td>${esc(s.label || s.id)}<div class="meta">weight ${esc(s.weight)}, ${esc(s.status)}</div></td><td>${esc(s.status === "known" ? "+" + s.points_min : "0.." + s.weight)}</td><td>${esc(s.basis)}${(s.evidence || []).map(e => quote(e.quote, e.source_url)).join("")}</td></tr>`).join("") + "</table>";
+  if (Array.isArray(score.penalties) && score.penalties.length)
+    h += "<p class='meta'>Penalties: " + score.penalties.map(p => esc((p.label || p.id) + " -" + p.points)).join(", ") + "</p>";
+  return h;
+}
+
+function renderContact(r) {
+  if (!r) return "";
+  const c = r.contact || r.chosen || r;
+  const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || c.name || "";
+  let h = `<p><b>${esc(name)}</b>${c.position ? ", " + esc(c.position) : ""}${c.email ? " &lt;" + esc(c.email) + "&gt;" : ""}${c.confidence != null ? ` <span class="meta">confidence ${esc(c.confidence)}</span>` : ""}${c.source ? ` <span class="badge">${esc(c.source)}</span>` : ""}</p>`;
+  const why = r.why || r.reason || r.rationale; if (why) h += `<p>${esc(why)}</p>`;
+  return h;
+}
+
+function renderDraft(r) {
+  const dr = findDraft(); if (!dr) return "";
+  const d = r.draft ? r : r;
+  let h = `<p class="meta">Subject</p><p><b>${esc(dr.subject)}</b></p>`;
+  const hook = d.hook || (r.draft && r.draft.hook) || r.evidence;
+  if (hook) h += `<p class="meta">Hook and evidence</p><p>${esc(typeof hook === "string" ? hook : JSON.stringify(hook))}</p>`;
+  return h;
+}
+
+function renderSent() {
+  const r = results.send && results.send.result; if (!r) return "";
+  const p = r.payload || r;
+  const live = r.mode === "sent" || (results.send && results.send.live_send && r.mode !== "dry_run");
+  return `<p><span class="badge ${live ? "b-ok" : "b-warn"}">${live ? "SENT" : "DRY RUN - not sent"}</span>${r.id ? ` <span class="meta">id ${esc(r.id)}</span>` : ""}</p>` +
+    `<table><tr><th>From</th><td>${esc(p.from)}</td></tr><tr><th>To</th><td>${esc([].concat(p.to || []).join(", "))}</td></tr><tr><th>Subject</th><td>${esc(p.subject)}</td></tr></table>` +
+    `<div class="mail">${esc(p.text || p.body || "")}</div>`;
+}
+
+function renderLog() {
+  const parts = [];
+  const sec = (t, h) => { if (h) parts.push(`<h3 style="margin:14px 0 4px;font-size:14px">${t}</h3>${h}`); };
+  if (results.qualify) sec("Why this company", renderQualify(results.qualify.result));
+  if (results.poc) sec("Why this person", renderContact(results.poc.result));
+  if (results.draft) sec("Why this email", renderDraft(results.draft.result || {}));
+  if (results.send) sec("The email", renderSent());
+  const last = Object.values(results).slice(-1)[0];
+  if (last && last.status && last.status !== "ok") sec("Run stopped", `<p><span class="badge b-warn">${esc(last.status)}</span> ${esc([last.stop_reason, last.detail].filter(Boolean).join(" - "))}</p>`);
+  $("log").innerHTML = parts.join("") || "<p class='meta'>Nothing to show yet.</p>";
+  $("logCard").classList.remove("hidden");
+}
+
+$("loginBtn").addEventListener("click", unlock);
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") unlock(); });
+$("runBtn").addEventListener("click", start);
+$("domain").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+$("lockBtn").addEventListener("click", lock);
+</script>
+</body>
+</html>

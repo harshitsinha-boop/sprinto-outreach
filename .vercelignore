@@ -1,0 +1,10 @@
+tests
+out
+.cache
+.planning
+.venv
+.git
+scripts
+*.lock.txt
+.env
+.env.*
