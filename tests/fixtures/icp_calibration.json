@@ -1,0 +1,580 @@
+{
+  "rubric_version": "icp.1",
+  "cases": [
+    {
+      "id": "fit_series_b_full_signals",
+      "kinds_usable": [
+        "home",
+        "about",
+        "careers",
+        "security",
+        "pricing",
+        "customers"
+      ],
+      "profile": {
+        "name": {
+          "value": "Ledgerly",
+          "quote": "Ledgerly is the company described on this page",
+          "source_url": "https://fit_series_b_full_signals.example/"
+        },
+        "offering": {
+          "value": "payroll software for HR teams",
+          "quote": "We build payroll software for HR teams for our customers",
+          "source_url": "https://fit_series_b_full_signals.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "We sell to businesses and teams",
+          "source_url": "https://fit_series_b_full_signals.example/"
+        },
+        "stage": {
+          "value": "series_b",
+          "as_of": "2026",
+          "quote": "We are a series_b company",
+          "source_url": "https://fit_series_b_full_signals.example/"
+        },
+        "headcount": {
+          "value": "51-200",
+          "quote": "Our team has 51-200 people",
+          "source_url": "https://fit_series_b_full_signals.example/"
+        },
+        "compliance_mentions": [
+          {
+            "framework": "SOC 2",
+            "status": "in_progress",
+            "as_of": null,
+            "quote": "We are working toward SOC 2 this year",
+            "source_url": "https://fit_series_b_full_signals.example/"
+          }
+        ],
+        "hiring_signals": [
+          {
+            "role": "Security Engineer",
+            "quote": "We are hiring a Security Engineer right now",
+            "source_url": "https://fit_series_b_full_signals.example/"
+          }
+        ],
+        "enterprise_customers": [
+          {
+            "name": "Northwind",
+            "quote": "Northwind is one of our customers",
+            "source_url": "https://fit_series_b_full_signals.example/"
+          },
+          {
+            "name": "Contoso",
+            "quote": "Contoso is one of our customers",
+            "source_url": "https://fit_series_b_full_signals.example/"
+          },
+          {
+            "name": "Globex",
+            "quote": "Globex is one of our customers",
+            "source_url": "https://fit_series_b_full_signals.example/"
+          }
+        ]
+      },
+      "expect": {
+        "initial_verdict": "qualified",
+        "verdict": "qualified",
+        "score_min": 100,
+        "score_max": 100
+      }
+    },
+    {
+      "id": "fit_series_a_planned",
+      "kinds_usable": [
+        "home",
+        "about",
+        "careers",
+        "security",
+        "pricing",
+        "customers"
+      ],
+      "profile": {
+        "name": {
+          "value": "Spendwise",
+          "quote": "Spendwise is the company described on this page",
+          "source_url": "https://fit_series_a_planned.example/"
+        },
+        "offering": {
+          "value": "expense management for finance teams",
+          "quote": "We build expense management for finance teams for our customers",
+          "source_url": "https://fit_series_a_planned.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "We sell to businesses and teams",
+          "source_url": "https://fit_series_a_planned.example/"
+        },
+        "stage": {
+          "value": "series_a",
+          "as_of": "2025",
+          "quote": "We are a series_a company",
+          "source_url": "https://fit_series_a_planned.example/"
+        },
+        "headcount": {
+          "value": "11-50",
+          "quote": "Our team has 11-50 people",
+          "source_url": "https://fit_series_a_planned.example/"
+        },
+        "compliance_mentions": [
+          {
+            "framework": "SOC 2",
+            "status": "planned",
+            "as_of": null,
+            "quote": "We plan to start SOC 2 next quarter",
+            "source_url": "https://fit_series_a_planned.example/"
+          }
+        ],
+        "hiring_signals": [
+          {
+            "role": "Compliance Manager",
+            "quote": "We are hiring a Compliance Manager right now",
+            "source_url": "https://fit_series_a_planned.example/"
+          }
+        ],
+        "enterprise_customers": [
+          {
+            "name": "Initech",
+            "quote": "Initech is one of our customers",
+            "source_url": "https://fit_series_a_planned.example/"
+          },
+          {
+            "name": "Hooli",
+            "quote": "Hooli is one of our customers",
+            "source_url": "https://fit_series_a_planned.example/"
+          }
+        ]
+      },
+      "expect": {
+        "initial_verdict": "qualified",
+        "verdict": "qualified",
+        "score_min": 93,
+        "score_max": 93
+      }
+    },
+    {
+      "id": "fit_unknown_stage",
+      "kinds_usable": [
+        "home",
+        "about",
+        "careers",
+        "security",
+        "pricing",
+        "customers"
+      ],
+      "profile": {
+        "name": {
+          "value": "Datafold One",
+          "quote": "Datafold One is the company described on this page",
+          "source_url": "https://fit_unknown_stage.example/"
+        },
+        "offering": {
+          "value": "customer data platform",
+          "quote": "We build customer data platform for our customers",
+          "source_url": "https://fit_unknown_stage.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "We sell to businesses and teams",
+          "source_url": "https://fit_unknown_stage.example/"
+        },
+        "stage": null,
+        "headcount": {
+          "value": "201-500",
+          "quote": "Our team has 201-500 people",
+          "source_url": "https://fit_unknown_stage.example/"
+        },
+        "compliance_mentions": [
+          {
+            "framework": "ISO 27001",
+            "status": "in_progress",
+            "as_of": null,
+            "quote": "Our ISO 27001 audit is under way",
+            "source_url": "https://fit_unknown_stage.example/"
+          }
+        ],
+        "hiring_signals": [
+          {
+            "role": "Head of Security",
+            "quote": "We are hiring a Head of Security right now",
+            "source_url": "https://fit_unknown_stage.example/"
+          }
+        ],
+        "enterprise_customers": [
+          {
+            "name": "Vandelay",
+            "quote": "Vandelay is one of our customers",
+            "source_url": "https://fit_unknown_stage.example/"
+          },
+          {
+            "name": "Umbrella",
+            "quote": "Umbrella is one of our customers",
+            "source_url": "https://fit_unknown_stage.example/"
+          },
+          {
+            "name": "Stark",
+            "quote": "Stark is one of our customers",
+            "source_url": "https://fit_unknown_stage.example/"
+          },
+          {
+            "name": "Wayne",
+            "quote": "Wayne is one of our customers",
+            "source_url": "https://fit_unknown_stage.example/"
+          }
+        ]
+      },
+      "expect": {
+        "initial_verdict": "qualified",
+        "verdict": "qualified",
+        "score_min": 70,
+        "score_max": 90
+      }
+    },
+    {
+      "id": "reject_consumer_app",
+      "kinds_usable": [
+        "home",
+        "about",
+        "careers",
+        "security",
+        "pricing",
+        "customers"
+      ],
+      "profile": {
+        "name": {
+          "value": "Pocket Pals",
+          "quote": "Pocket Pals is the company described on this page",
+          "source_url": "https://reject_consumer_app.example/"
+        },
+        "offering": {
+          "value": "mobile game for kids",
+          "quote": "We build mobile game for kids for our customers",
+          "source_url": "https://reject_consumer_app.example/"
+        },
+        "is_b2b": {
+          "value": false,
+          "quote": "We make an app for families at home",
+          "source_url": "https://reject_consumer_app.example/"
+        },
+        "stage": null,
+        "headcount": {
+          "value": "11-50",
+          "quote": "Our team has 11-50 people",
+          "source_url": "https://reject_consumer_app.example/"
+        },
+        "compliance_mentions": [],
+        "hiring_signals": [],
+        "enterprise_customers": []
+      },
+      "expect": {
+        "initial_verdict": "disqualified",
+        "verdict": "disqualified",
+        "score_min": 8,
+        "score_max": 28,
+        "gate_failed": "G1_b2b"
+      }
+    },
+    {
+      "id": "reject_over_1000",
+      "kinds_usable": [
+        "home",
+        "about",
+        "careers",
+        "security",
+        "pricing",
+        "customers"
+      ],
+      "profile": {
+        "name": {
+          "value": "MegaCorp Systems",
+          "quote": "MegaCorp Systems is the company described on this page",
+          "source_url": "https://reject_over_1000.example/"
+        },
+        "offering": {
+          "value": "enterprise resource software",
+          "quote": "We build enterprise resource software for our customers",
+          "source_url": "https://reject_over_1000.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "We sell to businesses and teams",
+          "source_url": "https://reject_over_1000.example/"
+        },
+        "stage": {
+          "value": "public",
+          "as_of": null,
+          "quote": "We are a public company",
+          "source_url": "https://reject_over_1000.example/"
+        },
+        "headcount": {
+          "value": "1001+",
+          "quote": "Our team has 1001+ people",
+          "source_url": "https://reject_over_1000.example/"
+        },
+        "compliance_mentions": [
+          {
+            "framework": "SOC 2",
+            "status": "mentioned",
+            "as_of": null,
+            "quote": "Customers often ask us about SOC 2",
+            "source_url": "https://reject_over_1000.example/"
+          }
+        ],
+        "hiring_signals": [
+          {
+            "role": "Security Engineer",
+            "quote": "We are hiring a Security Engineer right now",
+            "source_url": "https://reject_over_1000.example/"
+          }
+        ],
+        "enterprise_customers": [
+          {
+            "name": "A Co",
+            "quote": "A Co is one of our customers",
+            "source_url": "https://reject_over_1000.example/"
+          },
+          {
+            "name": "B Co",
+            "quote": "B Co is one of our customers",
+            "source_url": "https://reject_over_1000.example/"
+          },
+          {
+            "name": "C Co",
+            "quote": "C Co is one of our customers",
+            "source_url": "https://reject_over_1000.example/"
+          },
+          {
+            "name": "D Co",
+            "quote": "D Co is one of our customers",
+            "source_url": "https://reject_over_1000.example/"
+          },
+          {
+            "name": "E Co",
+            "quote": "E Co is one of our customers",
+            "source_url": "https://reject_over_1000.example/"
+          }
+        ]
+      },
+      "expect": {
+        "initial_verdict": "disqualified",
+        "verdict": "disqualified",
+        "score_min": 52,
+        "score_max": 62,
+        "gate_failed": "G3_size_ceiling"
+      }
+    },
+    {
+      "id": "reject_mature_certified",
+      "kinds_usable": [
+        "home",
+        "security",
+        "customers",
+        "careers"
+      ],
+      "profile": {
+        "name": {
+          "value": "Collabra",
+          "quote": "Collabra is the company described on this page",
+          "source_url": "https://reject_mature_certified.example/"
+        },
+        "offering": {
+          "value": "collaboration software",
+          "quote": "We build collaboration software for our customers",
+          "source_url": "https://reject_mature_certified.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "We sell to businesses and teams",
+          "source_url": "https://reject_mature_certified.example/"
+        },
+        "stage": {
+          "value": "public",
+          "as_of": null,
+          "quote": "We are a public company",
+          "source_url": "https://reject_mature_certified.example/"
+        },
+        "headcount": {
+          "value": "501-1000",
+          "quote": "Our team has 501-1000 people",
+          "source_url": "https://reject_mature_certified.example/"
+        },
+        "compliance_mentions": [
+          {
+            "framework": "SOC 2 Type II",
+            "status": "certified",
+            "as_of": null,
+            "quote": "We hold a SOC 2 Type II report",
+            "source_url": "https://reject_mature_certified.example/"
+          },
+          {
+            "framework": "ISO 27001",
+            "status": "certified",
+            "as_of": null,
+            "quote": "We are ISO 27001 certified",
+            "source_url": "https://reject_mature_certified.example/"
+          }
+        ],
+        "hiring_signals": [],
+        "enterprise_customers": [
+          {
+            "name": "A Co",
+            "quote": "A Co is one of our customers",
+            "source_url": "https://reject_mature_certified.example/"
+          },
+          {
+            "name": "B Co",
+            "quote": "B Co is one of our customers",
+            "source_url": "https://reject_mature_certified.example/"
+          },
+          {
+            "name": "C Co",
+            "quote": "C Co is one of our customers",
+            "source_url": "https://reject_mature_certified.example/"
+          },
+          {
+            "name": "D Co",
+            "quote": "D Co is one of our customers",
+            "source_url": "https://reject_mature_certified.example/"
+          },
+          {
+            "name": "E Co",
+            "quote": "E Co is one of our customers",
+            "source_url": "https://reject_mature_certified.example/"
+          }
+        ]
+      },
+      "expect": {
+        "initial_verdict": "disqualified",
+        "verdict": "disqualified",
+        "score_min": 6,
+        "score_max": 16,
+        "penalties": [
+          "P1_mature_soc2_type2_and_iso27001"
+        ]
+      }
+    },
+    {
+      "id": "gray_thin_seed",
+      "kinds_usable": [
+        "home"
+      ],
+      "profile": {
+        "name": {
+          "value": "Flowdesk",
+          "quote": "Flowdesk is the company described on this page",
+          "source_url": "https://gray_thin_seed.example/"
+        },
+        "offering": {
+          "value": "workflow tool for agencies",
+          "quote": "We build workflow tool for agencies for our customers",
+          "source_url": "https://gray_thin_seed.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "We sell to businesses and teams",
+          "source_url": "https://gray_thin_seed.example/"
+        },
+        "stage": {
+          "value": "seed",
+          "as_of": null,
+          "quote": "We are a seed company",
+          "source_url": "https://gray_thin_seed.example/"
+        },
+        "headcount": {
+          "value": "11-50",
+          "quote": "Our team has 11-50 people",
+          "source_url": "https://gray_thin_seed.example/"
+        },
+        "compliance_mentions": [],
+        "hiring_signals": [],
+        "enterprise_customers": []
+      },
+      "expect": {
+        "initial_verdict": "loop",
+        "verdict": "insufficient_data",
+        "score_min": 25,
+        "score_max": 90,
+        "decided_with_unknowns": [
+          "compliance_pursuit",
+          "enterprise_customers",
+          "security_hiring",
+          "recent_funding"
+        ]
+      }
+    },
+    {
+      "id": "gray_fully_known",
+      "kinds_usable": [
+        "home",
+        "about",
+        "careers",
+        "security",
+        "pricing",
+        "customers"
+      ],
+      "profile": {
+        "name": {
+          "value": "Slotly",
+          "quote": "Slotly is the company described on this page",
+          "source_url": "https://gray_fully_known.example/"
+        },
+        "offering": {
+          "value": "scheduling software for healthcare clinics",
+          "quote": "We build scheduling software for healthcare clinics for our customers",
+          "source_url": "https://gray_fully_known.example/"
+        },
+        "is_b2b": {
+          "value": true,
+          "quote": "We sell to businesses and teams",
+          "source_url": "https://gray_fully_known.example/"
+        },
+        "stage": {
+          "value": "bootstrapped",
+          "as_of": "2019",
+          "quote": "We are a bootstrapped company",
+          "source_url": "https://gray_fully_known.example/"
+        },
+        "headcount": {
+          "value": "11-50",
+          "quote": "Our team has 11-50 people",
+          "source_url": "https://gray_fully_known.example/"
+        },
+        "compliance_mentions": [
+          {
+            "framework": "GDPR",
+            "status": "mentioned",
+            "as_of": null,
+            "quote": "Our product is built to be GDPR friendly",
+            "source_url": "https://gray_fully_known.example/"
+          }
+        ],
+        "hiring_signals": [
+          {
+            "role": "Backend Engineer",
+            "quote": "We are hiring a Backend Engineer right now",
+            "source_url": "https://gray_fully_known.example/"
+          }
+        ],
+        "enterprise_customers": [
+          {
+            "name": "Clinic One",
+            "quote": "Clinic One is one of our customers",
+            "source_url": "https://gray_fully_known.example/"
+          },
+          {
+            "name": "Clinic Two",
+            "quote": "Clinic Two is one of our customers",
+            "source_url": "https://gray_fully_known.example/"
+          }
+        ]
+      },
+      "expect": {
+        "initial_verdict": "loop",
+        "verdict": "disqualified",
+        "score_min": 48,
+        "score_max": 48,
+        "decided_with_unknowns": []
+      }
+    }
+  ]
+}
